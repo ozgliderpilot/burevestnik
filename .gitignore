@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+.env
+
+# uv
+.uv-cache/
+
+# Playwright artifacts
+.playwright-mcp/
+test-results/
+playwright-report/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local screenshots from the brainstorming session (not part of source)
+meteoblue_weather.jpeg
+meteoblue_table.jpeg
+meteoblue_table_1h.jpeg
+# Manual smoke test output (Task 9, regenerated on demand)
+smoke.jpeg

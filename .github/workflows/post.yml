@@ -1,0 +1,54 @@
+name: Post weather to Telegram
+
+on:
+  schedule:
+    - cron: '17 6/12 * * *'  # Runs at 17 minutes past the hour, every 12 hours, starting 6 AM UTC
+  workflow_dispatch: {}   # manual trigger for testing
+  push:
+    branches: [master, main]   # CI test on push (skips cron logic)
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    environment: prd            # use the "prd" environment's secrets
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install Python deps
+        run: uv sync --extra dev --frozen
+
+      - name: Run tests
+        if: github.event_name == 'push'
+        run: uv run pytest
+
+      - name: Cache Playwright browsers
+        if: github.event_name != 'push'
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      - name: Install Chromium (cache miss)
+        if: github.event_name != 'push' && steps.playwright-cache.outputs.cache-hit != 'true'
+        run: uv run playwright install --with-deps chromium
+
+      - name: Install Chromium system deps only (cache hit)
+        if: github.event_name != 'push' && steps.playwright-cache.outputs.cache-hit == 'true'
+        run: uv run playwright install-deps chromium
+
+      - name: Post to Telegram
+        if: github.event_name != 'push'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: uv run python -m burevestnik.main

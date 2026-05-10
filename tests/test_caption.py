@@ -20,6 +20,7 @@ def _make_forecast(
     peak_pct: int = 88,
     peak_time: str = "12:00",
     tomorrow: DaySummary | None = _DEFAULT_TOMORROW,
+    uv_index: int = 2,
 ) -> Forecast:
     today = DaySummary(
         label="Today", weekday="Sun",
@@ -29,7 +30,8 @@ def _make_forecast(
         sun_hours=2.0,
     )
     return Forecast(today=today, tomorrow=tomorrow,
-                    peak_rain_pct=peak_pct, peak_rain_time=peak_time)
+                    peak_rain_pct=peak_pct, peak_rain_time=peak_time,
+                    uv_index=uv_index)
 
 
 def test_render_full_template():
@@ -86,7 +88,8 @@ def test_collapses_equal_rain_range():
         rain_mm_low=5.0, rain_mm_high=5.0, sun_hours=2.0,
     )
     f = Forecast(today=today, tomorrow=f.tomorrow,
-                 peak_rain_pct=f.peak_rain_pct, peak_rain_time=f.peak_rain_time)
+                 peak_rain_pct=f.peak_rain_pct, peak_rain_time=f.peak_rain_time,
+                 uv_index=f.uv_index)
     out = render(f, now, _SOURCE_URL)
     assert "5mm" in out
     assert "5–5mm" not in out

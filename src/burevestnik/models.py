@@ -19,3 +19,4 @@ class Forecast:
     tomorrow: DaySummary | None  # None when running in tomorrow-mode (post-16:00)
     peak_rain_pct: int          # max % across the displayed day's 1-hour slots
     peak_rain_time: str         # "HH:MM" — the slot where peak hit; "" if no rain
+    uv_index: int               # primary day's UV index (from page-level uv-index block)

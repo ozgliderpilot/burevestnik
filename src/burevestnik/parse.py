@@ -169,4 +169,5 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
         tomorrow=next_day,
         peak_rain_pct=peak_pct,
         peak_rain_time=peak_time,
+        uv_index=0,  # populated by parse_uv in Task 3
     )

@@ -31,7 +31,7 @@ main.py  →  scrape.fetch(url)  →  parse.extract(html)  →  caption.render(f
 
 Two key invariants make the parser tractable:
 
-1. **`scrape.py` is the only module with browser side effects.** It clicks through the meteoblue settings menu to force `CELSIUS / KNOT / MILLIMETER` units before extracting HTML — this is what makes `parse.py` regex-based and geo-IP-independent. Each unit click navigates back to the same URL, so the GDPR consent banner has to be re-dismissed after every click (`_dismiss_banner` is called in a loop). It also flips the table to the 1-hour view via `label.switch-with-label` and screenshots `table.hourlywind`.
+1. **`scrape.py` is the only module with browser side effects.** It pre-seeds the `temp` / `speed` / `precip` cookies on `www.meteoblue.com` so the page renders in `CELSIUS / KNOT / MILLIMETER` regardless of the runner's geo-IP — this is what makes `parse.py` regex-based and geo-IP-independent. (Cookie-based unit setting also avoids losing query strings like `?day=2`: meteoblue's settings-menu unit anchors point at the bare base URL, so clicking them in tomorrow-mode would silently revert the page to today.) It then flips the table to the 1-hour view via `label.switch-with-label` and screenshots `table.hourlywind`.
 
 2. **`parse.py` and `caption.py` are pure.** `parse.py` takes HTML strings and returns frozen `DaySummary` / `Forecast` dataclasses (defined in `models.py`); `caption.py` takes a `Forecast` + `datetime` and returns an HTML-formatted Telegram caption string (must stay under 1024 chars — Telegram's caption limit). All parser tests run against `tests/fixtures/meteoblue.html` — no live network in the test suite.
 

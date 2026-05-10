@@ -5,9 +5,16 @@ work entirely on its outputs.
 """
 from playwright.sync_api import Page, sync_playwright
 
-# Units we force on every fetch so output is independent of the runner's
-# geo-IP. meteoblue persists each click in the `mb` session cookie.
-_UNITS = ("CELSIUS", "KNOT", "MILLIMETER")
+# meteoblue stores each unit preference in its own cookie (keyed by the
+# `data-type` attribute on the unit anchors in the settings menu). Pre-seeding
+# the cookies lets us skip the click-through-the-settings-menu dance and avoids
+# losing query strings like ?day=2 to the unit anchors' bare-URL href.
+_UNIT_COOKIES = (
+    {"name": "temp", "value": "CELSIUS"},
+    {"name": "speed", "value": "KNOT"},
+    {"name": "precip", "value": "MILLIMETER"},
+)
+_COOKIE_DOMAIN = "www.meteoblue.com"
 
 
 def _dismiss_banner(page: Page) -> None:
@@ -17,19 +24,8 @@ def _dismiss_banner(page: Page) -> None:
     )
 
 
-def _force_unit(page: Page, data_unit: str) -> None:
-    """Open the settings menu and click the unit anchor for `data_unit`.
-
-    The click navigates back to the same URL with the preference saved in the
-    `mb` session cookie. Caller must dismiss the banner again afterwards.
-    """
-    page.locator("#settings").click()
-    page.locator(f'a.unit[data-unit="{data_unit}"]').click()
-    page.wait_for_load_state("networkidle")
-
-
 def fetch(url: str) -> tuple[str, bytes]:
-    """Open URL, force metric units, toggle to 1h view, screenshot the table.
+    """Open URL, force metric units via cookies, toggle 1h view, screenshot.
 
     Returns (rendered_html, jpeg_bytes). Raises if the toggle or table never
     appears within 5 seconds (treated as a meteoblue layout change).
@@ -38,17 +34,10 @@ def fetch(url: str) -> tuple[str, bytes]:
         browser = p.chromium.launch()
         context = browser.new_context(viewport={"width": 1280, "height": 900})
         try:
+            context.add_cookies(
+                [{**c, "domain": _COOKIE_DOMAIN, "path": "/"} for c in _UNIT_COOKIES]
+            )
             page = context.new_page()
-            page.goto(url, wait_until="networkidle")
-            _dismiss_banner(page)
-
-            for unit in _UNITS:
-                _force_unit(page, unit)
-                _dismiss_banner(page)
-
-            # Unit anchors' href is the bare base URL, so the clicks above strip
-            # any query string (e.g. ?day=2). Re-navigate to the requested URL
-            # now that the unit prefs are persisted in the `mb` session cookie.
             page.goto(url, wait_until="networkidle")
             _dismiss_banner(page)
 

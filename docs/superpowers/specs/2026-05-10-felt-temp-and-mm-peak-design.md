@@ -67,14 +67,14 @@ Thermometer line — no `<b>` around the value:
 f"🤚🌡 High {round(forecast.temp_felt_max_c)}° / Low {round(forecast.temp_felt_min_c)}°"
 ```
 
-Rain line — always emitted:
+Rain line — always emitted (bold on the peak value preserved from the current `<b>{pct}%</b>` style):
 ```python
 if today.rain_mm_high == 0:
     lines.append("☔ No rain")
 else:
     line = f"☔ Rain {_format_rain_range(today.rain_mm_low, today.rain_mm_high)}"
     if forecast.peak_rain_mm > 0:
-        line += f" · Peak {_format_peak_mm(forecast.peak_rain_mm)} at {forecast.peak_rain_time}"
+        line += f" · Peak <b>{_format_peak_mm(forecast.peak_rain_mm)}</b> at {forecast.peak_rain_time}"
     lines.append(line)
 ```
 

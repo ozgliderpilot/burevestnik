@@ -17,21 +17,28 @@ _DEFAULT_TOMORROW = DaySummary(
 
 
 def _make_forecast(
-    peak_pct: int = 88,
+    peak_mm: float = 1.5,
     peak_time: str = "12:00",
     tomorrow: DaySummary | None = _DEFAULT_TOMORROW,
     uv_index: int = 2,
+    rain_mm_low: float = 10.0,
+    rain_mm_high: float = 20.0,
+    temp_felt_max_c: int = 18,
+    temp_felt_min_c: int = 10,
 ) -> Forecast:
     today = DaySummary(
         label="Today", weekday="Sun",
         temp_max_c=21, temp_min_c=15,
         wind_kn_max=10,
-        rain_mm_low=10.0, rain_mm_high=20.0,
+        rain_mm_low=rain_mm_low, rain_mm_high=rain_mm_high,
         sun_hours=2.0,
     )
-    return Forecast(today=today, tomorrow=tomorrow,
-                    peak_rain_pct=peak_pct, peak_rain_time=peak_time,
-                    uv_index=uv_index)
+    return Forecast(
+        today=today, tomorrow=tomorrow,
+        peak_rain_mm=peak_mm, peak_rain_time=peak_time,
+        uv_index=uv_index,
+        temp_felt_max_c=temp_felt_max_c, temp_felt_min_c=temp_felt_min_c,
+    )
 
 
 def test_render_full_template():
@@ -43,13 +50,12 @@ def test_render_full_template():
     assert "Sunday" in out
     assert "3 May" in out
 
-    # Today temps
-    assert "<b>21°</b>" in out
-    assert "Low 15°" in out
+    # Felt-temp headline (no <b>, hand+thermometer icon)
+    assert "🤚🌡 High 18° / Low 10°" in out
 
-    # Rain line
+    # Rain line — peak mm, bold value
     assert "10–20mm" in out                 # en-dash
-    assert "<b>88%</b>" in out
+    assert "<b>1.5mm</b>" in out
     assert "at 12:00" in out
 
     # Wind (knots)
@@ -61,7 +67,7 @@ def test_render_full_template():
     assert re.search(r"🌅 \d{2}:\d{2}", out)
     assert re.search(r"🌇 \d{2}:\d{2}", out)
 
-    # Tomorrow line
+    # Tomorrow preview line still uses ACTUAL temps (no felt data for next day).
     assert "<i>Tomorrow:</i> 17°/13°" in out
     assert "0–2mm" in out
     assert "wind 12kn" in out
@@ -80,31 +86,45 @@ def test_caption_under_1024_chars():
 
 def test_collapses_equal_rain_range():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(peak_pct=50, peak_time="12:00")
-    # Replace today with rain_mm_low == rain_mm_high
-    today = DaySummary(
-        label="Today", weekday="Sun",
-        temp_max_c=21, temp_min_c=15, wind_kn_max=10,
-        rain_mm_low=5.0, rain_mm_high=5.0, sun_hours=2.0,
-    )
-    f = Forecast(today=today, tomorrow=f.tomorrow,
-                 peak_rain_pct=f.peak_rain_pct, peak_rain_time=f.peak_rain_time,
-                 uv_index=f.uv_index)
+    f = _make_forecast(rain_mm_low=5.0, rain_mm_high=5.0, peak_mm=0.5, peak_time="12:00")
     out = render(f, now, _SOURCE_URL)
     assert "5mm" in out
     assert "5–5mm" not in out
     assert "5-5mm" not in out
 
 
-def test_drops_rain_line_when_zero_peak():
+def test_renders_no_rain_when_daily_range_zero():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(peak_pct=0, peak_time="")
+    f = _make_forecast(rain_mm_low=0.0, rain_mm_high=0.0, peak_mm=0.0, peak_time="")
     out = render(f, now, _SOURCE_URL)
-    assert "☔" not in out
+    assert "☔ No rain" in out
     assert "Peak" not in out
     # Other lines still present
-    assert "🌡" in out
+    assert "🤚🌡" in out
     assert "💨" in out
+
+
+def test_omits_peak_tail_when_peak_mm_zero_but_range_nonzero():
+    # Mirrors the current fixture's situation: 47% probability but every
+    # hourly mm cell is empty/0, while the daily range is 0–2mm.
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(rain_mm_low=0.0, rain_mm_high=2.0, peak_mm=0.0, peak_time="")
+    out = render(f, now, _SOURCE_URL)
+    assert "☔ Rain 0–2mm" in out
+    assert "Peak" not in out
+
+
+def test_render_peak_mm_formats_one_decimal():
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(peak_mm=1.5, peak_time="14:00"), now, _SOURCE_URL)
+    assert "Peak <b>1.5mm</b> at 14:00" in out
+
+
+def test_render_peak_mm_strips_trailing_zero():
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(peak_mm=12.0, peak_time="14:00"), now, _SOURCE_URL)
+    assert "Peak <b>12mm</b> at 14:00" in out
+    assert "12.0mm" not in out
 
 
 def test_drops_sun_line_when_astral_unavailable():

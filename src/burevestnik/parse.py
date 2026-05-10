@@ -55,10 +55,7 @@ def parse_day(html: str, selector: str) -> DaySummary:
         rain_mm_low = float(rain_match.group(1))
         rain_mm_high = float(rain_match.group(2)) if rain_match.group(2) else rain_mm_low
     else:
-        # Dry forecast: meteoblue shows a dash instead of a mm range, treated
-        # as 0 mm. If peak_rain_pct > 0 in the same Forecast, that's a hint
-        # that the page layout changed (mm span vanished while the percent
-        # row remained) — the caption will then show "0mm alongside Peak N%".
+        # Dry forecast: meteoblue shows a dash instead of a mm range, treated as 0 mm.
         rain_mm_low = 0.0
         rain_mm_high = 0.0
 
@@ -79,73 +76,7 @@ def parse_day(html: str, selector: str) -> DaySummary:
     )
 
 
-_PCT_RE = re.compile(r"(\d+)\s*%")
 _UV_RE = re.compile(r"UV\s*(\d+)")
-
-
-def parse_peak_rain(html: str) -> tuple[int, str]:
-    """Find the highest rain-probability hour in table.hourlywind.
-
-    Returns (peak_pct, peak_time as 'HH:00'). Tie-breaking: earliest hour.
-    Returns (0, "") if no rain forecast at all.
-    """
-    doc = HTMLParser(html)
-    table = doc.css_first("table.hourlywind")
-    if table is None:
-        raise ValueError("table.hourlywind not found in document")
-
-    rows = table.css("tr")
-    if not rows:
-        raise ValueError("table.hourlywind has no rows")
-
-    # Header row: hour labels like "0100", "0200", ... possibly "01 00"
-    header_cells = rows[0].css("th, td")
-    hours: list[str] = []
-    for cell in header_cells:
-        digits = re.sub(r"\D", "", cell.text(strip=True))
-        if len(digits) >= 2 and digits[:2].isdigit():
-            hh = int(digits[:2])
-            if 0 <= hh <= 23:
-                hours.append(f"{hh:02d}:00")
-                continue
-        hours.append("")
-
-    # Find the row whose data cells are predominantly percentages.
-    rain_row = None
-    for row in rows[1:]:
-        cells = row.css("th, td")
-        if not cells:
-            continue
-        pct_count = sum(1 for c in cells if "%" in c.text())
-        if pct_count >= max(1, int(len(cells) * 0.6)):
-            rain_row = row
-            break
-
-    if rain_row is None:
-        raise ValueError("no rain probability row found in table.hourlywind")
-
-    cells = rain_row.css("th, td")
-    pcts: list[tuple[int, str]] = []  # (pct, hour_label)
-    for idx, cell in enumerate(cells):
-        m = _PCT_RE.search(cell.text())
-        if m is None:
-            continue
-        pcts.append((int(m.group(1)), hours[idx] if idx < len(hours) else ""))
-
-    if not pcts:
-        return 0, ""
-
-    max_pct = max(p for p, _ in pcts)
-    if max_pct == 0:
-        return 0, ""
-
-    # Earliest tie-break: first occurrence in document order.
-    # If the peak's hour cell is unlabeled (e.g. an empty <td> for the
-    # midnight column whose label is implicit), fall back to "00:00".
-    for pct, hour in pcts:
-        if pct == max_pct:
-            return pct, hour or "00:00"
-    return 0, ""
 
 
 def parse_uv(html: str) -> int:
@@ -267,9 +198,9 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     today-mode (default): #day1 → primary, #day2 → next-day preview.
     tomorrow-mode: #day2 → primary, no next-day preview (Forecast.tomorrow=None).
 
-    Peak-rain is read from table.hourlywind regardless of mode — when the page
-    is fetched with ?day=2, meteoblue renders that day's hourly chart in the
-    same table, so the existing parser surfaces the right values.
+    The hourly metrics (peak rain mm, felt temp high/low) are read from
+    table.hourlywind, which reflects whichever day the page was fetched
+    for (?day=2 swaps it to tomorrow at the runtime/scrape layer).
     """
     if for_tomorrow:
         primary = parse_day(html, "#day2")
@@ -277,12 +208,15 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     else:
         primary = parse_day(html, "#day1")
         next_day = parse_day(html, "#day2")
-    peak_pct, peak_time = parse_peak_rain(html)
+    peak_mm, peak_time = parse_peak_rain_mm(html)
+    felt_hi, felt_lo = parse_temp_felt(html)
     uv = parse_uv(html)
     return Forecast(
         today=primary,
         tomorrow=next_day,
-        peak_rain_pct=peak_pct,
+        peak_rain_mm=peak_mm,
         peak_rain_time=peak_time,
         uv_index=uv,
+        temp_felt_max_c=felt_hi,
+        temp_felt_min_c=felt_lo,
     )

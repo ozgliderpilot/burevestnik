@@ -27,6 +27,14 @@ def _format_rain_range(low: float, high: float) -> str:
     return f"{low_i}–{high_i}mm"
 
 
+def _format_peak_mm(mm: float) -> str:
+    """Format hourly mm with one decimal, stripping a trailing zero.
+
+    0.5 -> "0.5mm"; 1.5 -> "1.5mm"; 12.0 -> "12mm".
+    """
+    return f"{round(mm, 1):g}mm"
+
+
 def _uv_band(uv: int) -> tuple[str, str]:
     """Map a UV index to (emoji, risk label) per WHO bands.
 
@@ -79,14 +87,21 @@ def render(
             f"🌦 <b>Melbourne CBD</b> · {weekday_long}, {date_str}"
         )
     lines.append("")
-    lines.append(f"🌡 High <b>{round(today.temp_max_c)}°</b> / Low {round(today.temp_min_c)}°")
+    lines.append(
+        f"🤚🌡 High {round(forecast.temp_felt_max_c)}° / Low {round(forecast.temp_felt_min_c)}°"
+    )
 
-    if forecast.peak_rain_pct > 0:
+    if today.rain_mm_high == 0:
+        lines.append("☔ No rain")
+    else:
         rain_str = _format_rain_range(today.rain_mm_low, today.rain_mm_high)
-        lines.append(
-            f"☔ Rain {rain_str} · Peak <b>{forecast.peak_rain_pct}%</b> "
-            f"at {forecast.peak_rain_time}"
-        )
+        rain_line = f"☔ Rain {rain_str}"
+        if forecast.peak_rain_mm > 0:
+            rain_line += (
+                f" · Peak <b>{_format_peak_mm(forecast.peak_rain_mm)}</b> "
+                f"at {forecast.peak_rain_time}"
+            )
+        lines.append(rain_line)
 
     lines.append(f"💨 Wind up to {round(today.wind_kn_max)}kn")
 

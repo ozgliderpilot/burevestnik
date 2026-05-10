@@ -35,7 +35,7 @@ Two key invariants make the parser tractable:
 
 2. **`parse.py` and `caption.py` are pure.** `parse.py` takes HTML strings and returns frozen `DaySummary` / `Forecast` dataclasses (defined in `models.py`); `caption.py` takes a `Forecast` + `datetime` and returns an HTML-formatted Telegram caption string (must stay under 1024 chars — Telegram's caption limit). All parser tests run against `tests/fixtures/meteoblue.html` — no live network in the test suite.
 
-`parse.parse_peak_rain` finds the row in `table.hourlywind` whose cells are ≥60% percentages, then picks the highest `%` and the earliest hour on ties. If meteoblue ever changes the layout enough that the rain-mm span vanishes but the percent row remains, the caption will surface this as `0mm alongside Peak N%` — that's the diagnostic signal, not a bug.
+`parse.parse_peak_rain_mm` reads the row of hourly mm values from `table.hourlywind` (`tr.precip`) and returns the highest value with the earliest tie-break; `parse.parse_temp_felt` reads `tr.temperature-felt` from the same table and returns `(max, min)`. Both reflect whichever day the page was fetched for (`?day=2` swaps the table to tomorrow at the scrape layer), so they need no `for_tomorrow` flag.
 
 ## CI behavior
 

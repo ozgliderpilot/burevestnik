@@ -95,6 +95,9 @@ def render(
             f"☀ Sun {round(today.sun_hours)}h · 🌅 {sunrise} · 🌇 {sunset}"
         )
 
+    uv_emoji, uv_label = _uv_band(forecast.uv_index)
+    lines.append(f"UV index: {uv_emoji} {forecast.uv_index} ({uv_label})")
+
     if tomorrow is not None:
         lines.append("")
         tomorrow_rain = _format_rain_range(tomorrow.rain_mm_low, tomorrow.rain_mm_high)

@@ -194,3 +194,59 @@ def test_uv_band_maps_to_emoji_and_label(uv, expected_emoji, expected_label):
     emoji, label = _uv_band(uv)
     assert emoji == expected_emoji
     assert label == expected_label
+
+
+def test_render_includes_uv_line_today_mode():
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(uv_index=2), now, _SOURCE_URL)
+    assert "UV index: 🟢 2 (Low)" in out
+
+
+def test_render_includes_uv_line_tomorrow_mode():
+    now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(tomorrow=None, uv_index=7)
+    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    assert "UV index: 🟠 7 (High)" in out
+
+
+def test_render_uv_line_appears_after_sun_line():
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(uv_index=4), now, _SOURCE_URL)
+    lines = out.splitlines()
+    sun_idx = next(i for i, line in enumerate(lines) if "Sun 2h" in line)
+    uv_idx = next(i for i, line in enumerate(lines) if "UV index:" in line)
+    assert uv_idx == sun_idx + 1, (
+        f"UV line should immediately follow sun line; "
+        f"got sun at {sun_idx}, UV at {uv_idx}"
+    )
+
+
+def test_render_uv_line_appears_after_wind_when_sun_unavailable():
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(uv_index=4)
+    with patch("burevestnik.caption._sunrise_sunset", return_value=(None, None)):
+        out = render(f, now, _SOURCE_URL)
+    assert "☀" not in out  # sun line dropped
+    lines = out.splitlines()
+    wind_idx = next(i for i, line in enumerate(lines) if "Wind up to 10kn" in line)
+    uv_idx = next(i for i, line in enumerate(lines) if "UV index:" in line)
+    assert uv_idx == wind_idx + 1, (
+        f"UV line should immediately follow wind line when sun is dropped; "
+        f"got wind at {wind_idx}, UV at {uv_idx}"
+    )
+
+
+def test_render_tomorrow_preview_line_does_not_include_uv():
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(uv_index=4), now, _SOURCE_URL)
+    # The "<i>Tomorrow:</i> ..." line previews next-day stats but must NOT
+    # carry a UV value (meteoblue exposes no per-day UV in any day tab).
+    tomorrow_line = next(line for line in out.splitlines() if line.startswith("<i>Tomorrow:</i>"))
+    assert "UV" not in tomorrow_line
+
+
+def test_render_uv_line_present_at_uv_zero():
+    # UV 0 still renders — the layout is unconditional.
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(uv_index=0), now, _SOURCE_URL)
+    assert "UV index: 🟢 0 (Low)" in out

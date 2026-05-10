@@ -167,3 +167,49 @@ def test_extract_populates_uv_index_tomorrow_mode():
     # zero-out UV when for_tomorrow=True.
     f = extract(FIXTURE, for_tomorrow=True)
     assert f.uv_index == 2
+
+
+def test_parse_temp_felt_extracts_fixture_max_min():
+    from burevestnik.parse import parse_temp_felt
+    hi, lo = parse_temp_felt(FIXTURE)
+    # Locked to the captured fixture's actual felt-temp row.
+    assert hi == 13
+    assert lo == 10
+
+
+def test_parse_temp_felt_handles_negative_values():
+    from burevestnik.parse import parse_temp_felt
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr><th></th><th>0100</th><th>0200</th><th>0300</th></tr>
+      <tr class="temperature-felt">
+        <th title="Temperature felt (°C)"><span class="glyph"></span></th>
+        <td>-3°</td><td>-1°</td><td>2°</td>
+      </tr>
+    </table>
+    </body></html>
+    """
+    hi, lo = parse_temp_felt(html)
+    assert hi == 2
+    assert lo == -3
+
+
+def test_parse_temp_felt_raises_when_row_missing():
+    from burevestnik.parse import parse_temp_felt
+    html = '<html><body><table class="hourlywind"><tr><th></th><td>nope</td></tr></table></body></html>'
+    with pytest.raises(ValueError, match="temperature-felt"):
+        parse_temp_felt(html)
+
+
+def test_parse_temp_felt_raises_when_no_numeric_cells():
+    from burevestnik.parse import parse_temp_felt
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr class="temperature-felt"><th></th><td></td><td></td></tr>
+    </table>
+    </body></html>
+    """
+    with pytest.raises(ValueError, match="temperature-felt"):
+        parse_temp_felt(html)

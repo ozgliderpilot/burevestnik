@@ -168,6 +168,35 @@ def parse_uv(html: str) -> int:
     return int(m.group(1))
 
 
+_TEMP_CELL_RE = re.compile(r"(-?\d+)\s*°")
+
+
+def parse_temp_felt(html: str) -> tuple[int, int]:
+    """Extract (max, min) felt temperature from tr.temperature-felt.
+
+    The temperature-felt row lives inside table.hourlywind and carries 24
+    hourly °C cells like "10°", "13°", "-3°". The leading <th> has no
+    numeric content and is excluded by selecting only <td> cells.
+
+    Raises ValueError if the row is missing or contains no numeric cells.
+    """
+    doc = HTMLParser(html)
+    row = doc.css_first("tr.temperature-felt")
+    if row is None:
+        raise ValueError("tr.temperature-felt row not found in document")
+
+    values: list[int] = []
+    for cell in row.css("td"):
+        m = _TEMP_CELL_RE.search(cell.text())
+        if m is not None:
+            values.append(int(m.group(1)))
+
+    if not values:
+        raise ValueError("tr.temperature-felt has no numeric cells")
+
+    return max(values), min(values)
+
+
 def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     """Parse the displayed forecast from a meteoblue weekly-view HTML.
 

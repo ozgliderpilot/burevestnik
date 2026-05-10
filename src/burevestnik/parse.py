@@ -80,6 +80,7 @@ def parse_day(html: str, selector: str) -> DaySummary:
 
 
 _PCT_RE = re.compile(r"(\d+)\s*%")
+_UV_RE = re.compile(r"UV\s*(\d+)")
 
 
 def parse_peak_rain(html: str) -> tuple[int, str]:
@@ -145,6 +146,26 @@ def parse_peak_rain(html: str) -> tuple[int, str]:
         if pct == max_pct:
             return pct, hour or "00:00"
     return 0, ""
+
+
+def parse_uv(html: str) -> int:
+    """Extract the page-level UV index integer.
+
+    The uv-index block lives in a model-info / celestial-bodies section, not
+    inside any #dayN tab. It reflects whichever day the page is displaying
+    (today on the default fetch, tomorrow when the page is fetched with
+    ?day=2). The block is duplicated in the markup (no-mobile and no-desktop
+    variants); both carry identical content, so the first match is fine.
+    """
+    doc = HTMLParser(html)
+    el = doc.css_first("div.uv-index")
+    if el is None:
+        raise ValueError("uv-index element not found in document")
+    text = " ".join(el.text(strip=True).split())
+    m = _UV_RE.search(text)
+    if m is None:
+        raise ValueError(f"no UV value in uv-index text {text!r}")
+    return int(m.group(1))
 
 
 def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:

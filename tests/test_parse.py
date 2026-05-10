@@ -128,3 +128,30 @@ def test_extract_for_tomorrow_sets_tomorrow_field_to_none():
     # Sanity: peak rain still resolves (parser ignores the flag for hourly
     # — the page swap from ?day=2 is the runtime mechanism).
     assert 0 <= f.peak_rain_pct <= 100
+
+
+def test_parse_uv_extracts_fixture_value():
+    from burevestnik.parse import parse_uv
+    assert parse_uv(FIXTURE) == 2
+
+
+def test_parse_uv_raises_on_missing_element():
+    from burevestnik.parse import parse_uv
+    html = "<html><body><div>no uv here</div></body></html>"
+    with pytest.raises(ValueError, match="uv-index"):
+        parse_uv(html)
+
+
+def test_parse_uv_raises_when_text_unparseable():
+    from burevestnik.parse import parse_uv
+    html = '<html><body><div class="uv-index"><span class="uv-risk"></span>no number</div></body></html>'
+    with pytest.raises(ValueError, match="UV"):
+        parse_uv(html)
+
+
+def test_parse_uv_handles_extra_whitespace():
+    # meteoblue's actual markup has trailing whitespace inside the div ("UV 2   ").
+    # Make sure normalisation matches parse_day's behaviour.
+    from burevestnik.parse import parse_uv
+    html = '<html><body><div class="uv-index"><span class="uv-risk"></span>\n    UV   7   \n</div></body></html>'
+    assert parse_uv(html) == 7

@@ -166,3 +166,31 @@ def test_render_tomorrow_mode_uses_shifted_date_for_sun_lookup():
 
     from datetime import date
     assert captured["date"] == date(2026, 5, 11)
+
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "uv,expected_emoji,expected_label",
+    [
+        (0,  "🟢", "Low"),
+        (1,  "🟢", "Low"),
+        (2,  "🟢", "Low"),
+        (3,  "🟡", "Moderate"),
+        (4,  "🟡", "Moderate"),
+        (5,  "🟡", "Moderate"),
+        (6,  "🟠", "High"),
+        (7,  "🟠", "High"),
+        (8,  "🔴", "Very High"),
+        (9,  "🔴", "Very High"),
+        (10, "🔴", "Very High"),
+        (11, "🟣", "Extreme"),
+        (15, "🟣", "Extreme"),
+    ],
+)
+def test_uv_band_maps_to_emoji_and_label(uv, expected_emoji, expected_label):
+    from burevestnik.caption import _uv_band
+    emoji, label = _uv_band(uv)
+    assert emoji == expected_emoji
+    assert label == expected_label

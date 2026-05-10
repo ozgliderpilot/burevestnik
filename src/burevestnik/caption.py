@@ -27,6 +27,22 @@ def _format_rain_range(low: float, high: float) -> str:
     return f"{low_i}–{high_i}mm"
 
 
+def _uv_band(uv: int) -> tuple[str, str]:
+    """Map a UV index to (emoji, risk label) per WHO bands.
+
+    Bands: 0-2 Low, 3-5 Moderate, 6-7 High, 8-10 Very High, 11+ Extreme.
+    """
+    if uv <= 2:
+        return "🟢", "Low"
+    if uv <= 5:
+        return "🟡", "Moderate"
+    if uv <= 7:
+        return "🟠", "High"
+    if uv <= 10:
+        return "🔴", "Very High"
+    return "🟣", "Extreme"
+
+
 def _sunrise_sunset(now: datetime) -> tuple[str, str] | tuple[None, None]:
     try:
         s = sun(MELBOURNE.observer, date=now.date(), tzinfo=MELBOURNE_TZ)

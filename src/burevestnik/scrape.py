@@ -46,6 +46,12 @@ def fetch(url: str) -> tuple[str, bytes]:
                 _force_unit(page, unit)
                 _dismiss_banner(page)
 
+            # Unit anchors' href is the bare base URL, so the clicks above strip
+            # any query string (e.g. ?day=2). Re-navigate to the requested URL
+            # now that the unit prefs are persisted in the `mb` session cookie.
+            page.goto(url, wait_until="networkidle")
+            _dismiss_banner(page)
+
             page.locator("label.switch-with-label").first.click()
             page.locator("table.hourlywind").wait_for(state="visible", timeout=5000)
             html = page.content()

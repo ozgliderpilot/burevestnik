@@ -57,9 +57,9 @@ def test_render_full_template():
     # Felt-temp headline (no <b>, hand+thermometer icon)
     assert "🤚🌡 High 18° / Low 10°" in out
 
-    # Rain line — peak mm, plain (un-bolded) value
+    # Rain line — peak mm with intensity band, plain (un-bolded) value
     assert "10–20mm" in out                 # en-dash
-    assert "Peak 1.5mm at 12:00" in out
+    assert "🟡 Peak 1.5mm at 12:00" in out
     assert "<b>1.5mm</b>" not in out
 
     # Wind (knots) — hourly range + peak gust, all plain text
@@ -121,14 +121,14 @@ def test_omits_peak_tail_when_peak_mm_zero_but_range_nonzero():
 def test_render_peak_mm_formats_one_decimal():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(peak_mm=1.5, peak_time="14:00"), now, _SOURCE_URL)
-    assert "Peak 1.5mm at 14:00" in out
+    assert "🟡 Peak 1.5mm at 14:00" in out
     assert "<b>1.5mm</b>" not in out
 
 
 def test_render_peak_mm_strips_trailing_zero():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(peak_mm=12.0, peak_time="14:00"), now, _SOURCE_URL)
-    assert "Peak 12mm at 14:00" in out
+    assert "🔴 Peak 12mm at 14:00" in out
     assert "12.0mm" not in out
     assert "<b>12mm</b>" not in out
 
@@ -293,6 +293,26 @@ def test_render_tomorrow_preview_line_does_not_include_uv():
     # carry a UV value (meteoblue exposes no per-day UV in any day tab).
     tomorrow_line = next(line for line in out.splitlines() if line.startswith("<i>Tomorrow:</i>"))
     assert "UV" not in tomorrow_line
+
+
+@pytest.mark.parametrize(
+    "peak_mm,expected_emoji",
+    [
+        (0.1, "🟢"),
+        (1.0, "🟢"),
+        (1.01, "🟡"),
+        (3.5, "🟡"),
+        (5.0, "🟡"),
+        (5.01, "🟠"),
+        (7.5, "🟠"),
+        (10.0, "🟠"),
+        (10.01, "🔴"),
+        (50.0, "🔴"),
+    ],
+)
+def test_rain_band_maps_peak_to_emoji(peak_mm, expected_emoji):
+    from burevestnik.caption import _rain_band
+    assert _rain_band(peak_mm) == expected_emoji
 
 
 def test_render_uv_line_present_at_uv_zero():

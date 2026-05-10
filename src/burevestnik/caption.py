@@ -35,6 +35,20 @@ def _format_peak_mm(mm: float) -> str:
     return f"{round(mm, 1):g}mm"
 
 
+def _rain_band(peak_mm: float) -> str:
+    """Map peak hourly rain (mm/h) to a band emoji.
+
+    Bands: ≤1 🟢 (no umbrella), ≤5 🟡, ≤10 🟠, >10 🔴.
+    """
+    if peak_mm <= 1:
+        return "🟢"
+    if peak_mm <= 5:
+        return "🟡"
+    if peak_mm <= 10:
+        return "🟠"
+    return "🔴"
+
+
 def _uv_band(uv: int) -> tuple[str, str]:
     """Map a UV index to (emoji, risk label) per WHO bands.
 
@@ -98,7 +112,8 @@ def render(
         rain_line = f"☔ Rain {rain_str}"
         if forecast.peak_rain_mm > 0:
             rain_line += (
-                f" · Peak {_format_peak_mm(forecast.peak_rain_mm)}"
+                f" · {_rain_band(forecast.peak_rain_mm)}"
+                f" Peak {_format_peak_mm(forecast.peak_rain_mm)}"
                 f" at {forecast.peak_rain_time}"
             )
         lines.append(rain_line)

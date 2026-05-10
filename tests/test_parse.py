@@ -113,3 +113,18 @@ def test_extract_returns_full_forecast():
     assert f.today.label == "Today"
     assert f.tomorrow.label == "Tomorrow"
     assert 0 <= f.peak_rain_pct <= 100
+
+
+def test_extract_for_tomorrow_uses_day2_as_primary():
+    f = extract(FIXTURE, for_tomorrow=True)
+    # #day2's long-label is "Tomorrow" in the meteoblue fixture; with
+    # for_tomorrow=True we promote that day to the primary slot.
+    assert f.today.label == "Tomorrow"
+
+
+def test_extract_for_tomorrow_sets_tomorrow_field_to_none():
+    f = extract(FIXTURE, for_tomorrow=True)
+    assert f.tomorrow is None
+    # Sanity: peak rain still resolves (parser ignores the flag for hourly
+    # — the page swap from ?day=2 is the runtime mechanism).
+    assert 0 <= f.peak_rain_pct <= 100

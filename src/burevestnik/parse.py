@@ -147,14 +147,26 @@ def parse_peak_rain(html: str) -> tuple[int, str]:
     return 0, ""
 
 
-def extract(html: str) -> Forecast:
-    """Parse today + tomorrow + peak rain from a meteoblue weekly-view HTML."""
-    today = parse_day(html, "#day1")
-    tomorrow = parse_day(html, "#day2")
+def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
+    """Parse the displayed forecast from a meteoblue weekly-view HTML.
+
+    today-mode (default): #day1 → primary, #day2 → next-day preview.
+    tomorrow-mode: #day2 → primary, no next-day preview (Forecast.tomorrow=None).
+
+    Peak-rain is read from table.hourlywind regardless of mode — when the page
+    is fetched with ?day=2, meteoblue renders that day's hourly chart in the
+    same table, so the existing parser surfaces the right values.
+    """
+    if for_tomorrow:
+        primary = parse_day(html, "#day2")
+        next_day: DaySummary | None = None
+    else:
+        primary = parse_day(html, "#day1")
+        next_day = parse_day(html, "#day2")
     peak_pct, peak_time = parse_peak_rain(html)
     return Forecast(
-        today=today,
-        tomorrow=tomorrow,
+        today=primary,
+        tomorrow=next_day,
         peak_rain_pct=peak_pct,
         peak_rain_time=peak_time,
     )

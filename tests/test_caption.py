@@ -7,20 +7,26 @@ from burevestnik.models import DaySummary, Forecast
 _SOURCE_URL = "https://www.meteoblue.com/en/weather/week/melbourne-cbd_australia_11523810"
 
 
-def _make_forecast(peak_pct: int = 88, peak_time: str = "12:00") -> Forecast:
+_DEFAULT_TOMORROW = DaySummary(
+    label="Tomorrow", weekday="Mon",
+    temp_max_c=17, temp_min_c=13,
+    wind_kn_max=12,
+    rain_mm_low=0.0, rain_mm_high=2.0,
+    sun_hours=6.0,
+)
+
+
+def _make_forecast(
+    peak_pct: int = 88,
+    peak_time: str = "12:00",
+    tomorrow: DaySummary | None = _DEFAULT_TOMORROW,
+) -> Forecast:
     today = DaySummary(
         label="Today", weekday="Sun",
         temp_max_c=21, temp_min_c=15,
         wind_kn_max=10,
         rain_mm_low=10.0, rain_mm_high=20.0,
         sun_hours=2.0,
-    )
-    tomorrow = DaySummary(
-        label="Tomorrow", weekday="Mon",
-        temp_max_c=17, temp_min_c=13,
-        wind_kn_max=12,
-        rain_mm_low=0.0, rain_mm_high=2.0,
-        sun_hours=6.0,
     )
     return Forecast(today=today, tomorrow=tomorrow,
                     peak_rain_pct=peak_pct, peak_rain_time=peak_time)
@@ -109,3 +115,51 @@ def test_drops_sun_line_when_astral_unavailable():
     # Wind/temp/tomorrow still present
     assert "💨" in out
     assert "Tomorrow:" in out
+
+
+def test_render_tomorrow_mode_header_contains_tomorrow_prefix_and_shifted_date():
+    # Run time: Sun 10 May 2026 18:00 → forecast date is Mon 11 May.
+    now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(tomorrow=None)
+    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+
+    # Header: "🌦 <b>Melbourne CBD</b> · Tomorrow, Monday 11 May"
+    assert "<b>Melbourne CBD</b>" in out
+    assert "Tomorrow, Monday" in out
+    assert "11 May" in out
+    # Today-mode header pattern must NOT appear (no plain "Sunday, 10 May").
+    assert "Sunday, 10 May" not in out
+
+
+def test_render_tomorrow_mode_omits_preview_line():
+    now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(tomorrow=None)
+    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    assert "<i>Tomorrow:</i>" not in out
+
+
+def test_render_tomorrow_mode_keeps_run_time_in_updated_line():
+    now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(tomorrow=None)
+    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    # "Updated 18:00 AEST" — the actual run time, not the forecast date.
+    assert "Updated 18:00" in out
+
+
+def test_render_tomorrow_mode_uses_shifted_date_for_sun_lookup():
+    # The sunrise/sunset lookup must be for the forecast date (11 May), not
+    # the run date (10 May). Spy on _sunrise_sunset to capture its argument.
+    now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(tomorrow=None)
+
+    captured: dict = {}
+
+    def spy(now_arg):
+        captured["date"] = now_arg.date()
+        return ("06:00", "17:00")
+
+    with patch("burevestnik.caption._sunrise_sunset", side_effect=spy):
+        render(f, now, _SOURCE_URL, for_tomorrow=True)
+
+    from datetime import date
+    assert captured["date"] == date(2026, 5, 11)

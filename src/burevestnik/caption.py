@@ -2,7 +2,7 @@
 
 Telegram caption limit is 1024 chars; output must stay under that.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from astral import LocationInfo
@@ -35,17 +35,33 @@ def _sunrise_sunset(now: datetime) -> tuple[str, str] | tuple[None, None]:
         return None, None
 
 
-def render(forecast: Forecast, now: datetime, source_url: str) -> str:
+def render(
+    forecast: Forecast,
+    now: datetime,
+    source_url: str,
+    for_tomorrow: bool = False,
+) -> str:
     today = forecast.today
     tomorrow = forecast.tomorrow
 
-    weekday_long = now.strftime("%A")
-    date_str = f"{now.day} {now.strftime('%B')}"
+    # The displayed forecast date: shift +1 day in tomorrow-mode. The
+    # "Updated HH:MM TZ" line below still uses `now` (actual run time).
+    forecast_dt = now + timedelta(days=1) if for_tomorrow else now
 
-    sunrise, sunset = _sunrise_sunset(now)
+    weekday_long = forecast_dt.strftime("%A")
+    date_str = f"{forecast_dt.day} {forecast_dt.strftime('%B')}"
+
+    sunrise, sunset = _sunrise_sunset(forecast_dt)
 
     lines: list[str] = []
-    lines.append(f"🌦 <b>Melbourne CBD</b> · {weekday_long}, {date_str}")
+    if for_tomorrow:
+        lines.append(
+            f"🌦 <b>Melbourne CBD</b> · Tomorrow, {weekday_long} {date_str}"
+        )
+    else:
+        lines.append(
+            f"🌦 <b>Melbourne CBD</b> · {weekday_long}, {date_str}"
+        )
     lines.append("")
     lines.append(f"🌡 High <b>{round(today.temp_max_c)}°</b> / Low {round(today.temp_min_c)}°")
 
@@ -63,12 +79,14 @@ def render(forecast: Forecast, now: datetime, source_url: str) -> str:
             f"☀ Sun {round(today.sun_hours)}h · 🌅 {sunrise} · 🌇 {sunset}"
         )
 
-    lines.append("")
-    tomorrow_rain = _format_rain_range(tomorrow.rain_mm_low, tomorrow.rain_mm_high)
-    lines.append(
-        f"<i>Tomorrow:</i> {round(tomorrow.temp_max_c)}°/{round(tomorrow.temp_min_c)}° "
-        f"· {tomorrow_rain} · wind {round(tomorrow.wind_kn_max)}kn"
-    )
+    if tomorrow is not None:
+        lines.append("")
+        tomorrow_rain = _format_rain_range(tomorrow.rain_mm_low, tomorrow.rain_mm_high)
+        lines.append(
+            f"<i>Tomorrow:</i> {round(tomorrow.temp_max_c)}°/{round(tomorrow.temp_min_c)}° "
+            f"· {tomorrow_rain} · wind {round(tomorrow.wind_kn_max)}kn"
+        )
+
     lines.append("")
     lines.append(
         f'<i>Updated {now.strftime("%H:%M %Z")} · '

@@ -1,7 +1,7 @@
 [project]
 name = "burevestnik"
 version = "0.1.0"
-description = "Telegram bot posting meteoblue North Melbourne forecast"
+description = "Telegram bot posting meteoblue Melbourne CBD forecast"
 requires-python = ">=3.12"
 dependencies = [
     "playwright>=1.40",

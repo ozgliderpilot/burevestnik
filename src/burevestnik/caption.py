@@ -98,12 +98,16 @@ def render(
         rain_line = f"☔ Rain {rain_str}"
         if forecast.peak_rain_mm > 0:
             rain_line += (
-                f" · Peak <b>{_format_peak_mm(forecast.peak_rain_mm)}</b> "
-                f"at {forecast.peak_rain_time}"
+                f" · Peak {_format_peak_mm(forecast.peak_rain_mm)}"
+                f" at {forecast.peak_rain_time}"
             )
         lines.append(rain_line)
 
-    lines.append(f"💨 Wind up to {round(today.wind_kn_max)}kn")
+    if forecast.wind_kn_low == forecast.wind_kn_high:
+        wind_str = f"{forecast.wind_kn_high}kn"
+    else:
+        wind_str = f"{forecast.wind_kn_low}–{forecast.wind_kn_high}kn"
+    lines.append(f"💨 Wind {wind_str} · gusts to {forecast.gust_kn_max}kn")
 
     if sunrise is not None and sunset is not None:
         lines.append(

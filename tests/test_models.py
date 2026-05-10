@@ -26,10 +26,14 @@ def test_forecast_constructs():
         peak_rain_mm=1.5, peak_rain_time="12:00",
         uv_index=2,
         temp_felt_max_c=18, temp_felt_min_c=10,
+        wind_kn_low=2, wind_kn_high=7, gust_kn_max=22,
     )
     assert f.peak_rain_mm == 1.5
     assert f.temp_felt_max_c == 18
     assert f.temp_felt_min_c == 10
+    assert f.wind_kn_low == 2
+    assert f.wind_kn_high == 7
+    assert f.gust_kn_max == 22
 
 
 def test_forecast_has_uv_index():
@@ -42,6 +46,7 @@ def test_forecast_has_uv_index():
         peak_rain_mm=1.5, peak_rain_time="12:00",
         uv_index=4,
         temp_felt_max_c=18, temp_felt_min_c=10,
+        wind_kn_low=2, wind_kn_high=7, gust_kn_max=22,
     )
     assert f.uv_index == 4
 

@@ -192,6 +192,60 @@ def parse_peak_rain_mm(html: str) -> tuple[float, str]:
     return 0.0, ""
 
 
+_INT_CELL_RE = re.compile(r"-?\d+")
+
+
+def parse_wind_range(html: str) -> tuple[int, int]:
+    """Extract (min, max) hourly wind speed in knots from tr.windspeed.
+
+    The windspeed row inside table.hourlywind carries 24 hourly cells, each
+    a bare integer kn value (e.g. "7"). The leading <th> has no numeric
+    content and is excluded by selecting only <td> cells.
+
+    Raises ValueError if the row is missing or has no numeric cells.
+    """
+    doc = HTMLParser(html)
+    row = doc.css_first("tr.windspeed")
+    if row is None:
+        raise ValueError("tr.windspeed row not found in document")
+
+    values: list[int] = []
+    for cell in row.css("td"):
+        m = _INT_CELL_RE.search(cell.text())
+        if m is not None:
+            values.append(int(m.group(0)))
+
+    if not values:
+        raise ValueError("tr.windspeed has no numeric cells")
+
+    return min(values), max(values)
+
+
+def parse_peak_gust_kn(html: str) -> int:
+    """Extract the peak hourly wind gust in knots from tr.windgust.
+
+    Mirrors parse_wind_range but only returns the max — gust timing is
+    typically clustered around the wind peak and not separately rendered.
+
+    Raises ValueError if the row is missing or has no numeric cells.
+    """
+    doc = HTMLParser(html)
+    row = doc.css_first("tr.windgust")
+    if row is None:
+        raise ValueError("tr.windgust row not found in document")
+
+    values: list[int] = []
+    for cell in row.css("td"):
+        m = _INT_CELL_RE.search(cell.text())
+        if m is not None:
+            values.append(int(m.group(0)))
+
+    if not values:
+        raise ValueError("tr.windgust has no numeric cells")
+
+    return max(values)
+
+
 def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     """Parse the displayed forecast from a meteoblue weekly-view HTML.
 
@@ -211,6 +265,8 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     peak_mm, peak_time = parse_peak_rain_mm(html)
     felt_hi, felt_lo = parse_temp_felt(html)
     uv = parse_uv(html)
+    wind_lo, wind_hi = parse_wind_range(html)
+    gust = parse_peak_gust_kn(html)
     return Forecast(
         today=primary,
         tomorrow=next_day,
@@ -219,4 +275,7 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
         uv_index=uv,
         temp_felt_max_c=felt_hi,
         temp_felt_min_c=felt_lo,
+        wind_kn_low=wind_lo,
+        wind_kn_high=wind_hi,
+        gust_kn_max=gust,
     )

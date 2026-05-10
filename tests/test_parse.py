@@ -249,3 +249,90 @@ def test_parse_peak_rain_mm_raises_when_row_missing():
     html = '<html><body><table class="hourlywind"><tr><th></th></tr></table></body></html>'
     with pytest.raises(ValueError, match="precip"):
         parse_peak_rain_mm(html)
+
+
+def test_parse_wind_range_extracts_fixture_min_max():
+    from burevestnik.parse import parse_wind_range
+    lo, hi = parse_wind_range(FIXTURE)
+    # Fixture's tr.windspeed: 7,7,6,6,6,6,6,6,6,6,6,6,6,5,5,5,4,3,3,2,2,2,2,3.
+    assert lo == 2
+    assert hi == 7
+
+
+def test_parse_wind_range_handles_constant_row():
+    from burevestnik.parse import parse_wind_range
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr class="windspeed"><th></th><td>5</td><td>5</td><td>5</td></tr>
+    </table>
+    </body></html>
+    """
+    lo, hi = parse_wind_range(html)
+    assert lo == 5
+    assert hi == 5
+
+
+def test_parse_wind_range_raises_when_row_missing():
+    from burevestnik.parse import parse_wind_range
+    html = '<html><body><table class="hourlywind"><tr><th></th><td>nope</td></tr></table></body></html>'
+    with pytest.raises(ValueError, match="windspeed"):
+        parse_wind_range(html)
+
+
+def test_parse_wind_range_raises_when_no_numeric_cells():
+    from burevestnik.parse import parse_wind_range
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr class="windspeed"><th></th><td></td><td></td></tr>
+    </table>
+    </body></html>
+    """
+    with pytest.raises(ValueError, match="windspeed"):
+        parse_wind_range(html)
+
+
+def test_parse_peak_gust_kn_extracts_fixture_value():
+    from burevestnik.parse import parse_peak_gust_kn
+    # Fixture's tr.windgust peaks at 22 in the first cell.
+    assert parse_peak_gust_kn(FIXTURE) == 22
+
+
+def test_parse_peak_gust_kn_picks_max_value():
+    from burevestnik.parse import parse_peak_gust_kn
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr class="windgust"><th></th><td>10</td><td>30</td><td>15</td></tr>
+    </table>
+    </body></html>
+    """
+    assert parse_peak_gust_kn(html) == 30
+
+
+def test_parse_peak_gust_kn_raises_when_row_missing():
+    from burevestnik.parse import parse_peak_gust_kn
+    html = '<html><body><table class="hourlywind"><tr><th></th><td>5</td></tr></table></body></html>'
+    with pytest.raises(ValueError, match="windgust"):
+        parse_peak_gust_kn(html)
+
+
+def test_parse_peak_gust_kn_raises_when_no_numeric_cells():
+    from burevestnik.parse import parse_peak_gust_kn
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr class="windgust"><th></th><td></td></tr>
+    </table>
+    </body></html>
+    """
+    with pytest.raises(ValueError, match="windgust"):
+        parse_peak_gust_kn(html)
+
+
+def test_extract_populates_wind_and_gust_fields():
+    f = extract(FIXTURE)
+    assert f.wind_kn_low == 2
+    assert f.wind_kn_high == 7
+    assert f.gust_kn_max == 22

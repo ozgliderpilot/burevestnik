@@ -25,6 +25,9 @@ def _make_forecast(
     rain_mm_high: float = 20.0,
     temp_felt_max_c: int = 18,
     temp_felt_min_c: int = 10,
+    wind_kn_low: int = 4,
+    wind_kn_high: int = 10,
+    gust_kn_max: int = 22,
 ) -> Forecast:
     today = DaySummary(
         label="Today", weekday="Sun",
@@ -38,6 +41,7 @@ def _make_forecast(
         peak_rain_mm=peak_mm, peak_rain_time=peak_time,
         uv_index=uv_index,
         temp_felt_max_c=temp_felt_max_c, temp_felt_min_c=temp_felt_min_c,
+        wind_kn_low=wind_kn_low, wind_kn_high=wind_kn_high, gust_kn_max=gust_kn_max,
     )
 
 
@@ -53,13 +57,13 @@ def test_render_full_template():
     # Felt-temp headline (no <b>, hand+thermometer icon)
     assert "🤚🌡 High 18° / Low 10°" in out
 
-    # Rain line — peak mm, bold value
+    # Rain line — peak mm, plain (un-bolded) value
     assert "10–20mm" in out                 # en-dash
-    assert "<b>1.5mm</b>" in out
-    assert "at 12:00" in out
+    assert "Peak 1.5mm at 12:00" in out
+    assert "<b>1.5mm</b>" not in out
 
-    # Wind (knots)
-    assert "Wind up to 10kn" in out
+    # Wind (knots) — hourly range + peak gust, all plain text
+    assert "💨 Wind 4–10kn · gusts to 22kn" in out
 
     # Sun line — sunrise/sunset just need to be HH:MM format
     assert "Sun 2h" in out
@@ -117,14 +121,40 @@ def test_omits_peak_tail_when_peak_mm_zero_but_range_nonzero():
 def test_render_peak_mm_formats_one_decimal():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(peak_mm=1.5, peak_time="14:00"), now, _SOURCE_URL)
-    assert "Peak <b>1.5mm</b> at 14:00" in out
+    assert "Peak 1.5mm at 14:00" in out
+    assert "<b>1.5mm</b>" not in out
 
 
 def test_render_peak_mm_strips_trailing_zero():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(peak_mm=12.0, peak_time="14:00"), now, _SOURCE_URL)
-    assert "Peak <b>12mm</b> at 14:00" in out
+    assert "Peak 12mm at 14:00" in out
     assert "12.0mm" not in out
+    assert "<b>12mm</b>" not in out
+
+
+def test_render_collapses_equal_wind_range():
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(
+        _make_forecast(wind_kn_low=7, wind_kn_high=7, gust_kn_max=15),
+        now,
+        _SOURCE_URL,
+    )
+    assert "💨 Wind 7kn · gusts to 15kn" in out
+    assert "7–7kn" not in out
+
+
+def test_render_wind_line_is_plain_text():
+    # Both wind and gust values render without <b> tags.
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(
+        _make_forecast(wind_kn_low=4, wind_kn_high=10, gust_kn_max=22),
+        now,
+        _SOURCE_URL,
+    )
+    wind_line = next(line for line in out.splitlines() if line.startswith("💨"))
+    assert "<b>" not in wind_line
+    assert "</b>" not in wind_line
 
 
 def test_drops_sun_line_when_astral_unavailable():
@@ -248,7 +278,7 @@ def test_render_uv_line_appears_after_wind_when_sun_unavailable():
         out = render(f, now, _SOURCE_URL)
     assert "☀" not in out  # sun line dropped
     lines = out.splitlines()
-    wind_idx = next(i for i, line in enumerate(lines) if "Wind up to 10kn" in line)
+    wind_idx = next(i for i, line in enumerate(lines) if line.startswith("💨"))
     uv_idx = next(i for i, line in enumerate(lines) if "UV index:" in line)
     assert uv_idx == wind_idx + 1, (
         f"UV line should immediately follow wind line when sun is dropped; "

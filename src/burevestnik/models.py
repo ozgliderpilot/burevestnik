@@ -22,3 +22,6 @@ class Forecast:
     uv_index: int                # primary day's UV index (from page-level uv-index block)
     temp_felt_max_c: int         # max felt °C across the displayed day's temperature-felt row
     temp_felt_min_c: int         # min felt °C across the displayed day's temperature-felt row
+    wind_kn_low: int             # min hourly wind kn across the displayed day's windspeed row
+    wind_kn_high: int            # max hourly wind kn across the displayed day's windspeed row
+    gust_kn_max: int             # max hourly gust kn across the displayed day's windgust row

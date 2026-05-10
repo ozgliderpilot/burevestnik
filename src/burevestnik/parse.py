@@ -185,10 +185,11 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
         primary = parse_day(html, "#day1")
         next_day = parse_day(html, "#day2")
     peak_pct, peak_time = parse_peak_rain(html)
+    uv = parse_uv(html)
     return Forecast(
         today=primary,
         tomorrow=next_day,
         peak_rain_pct=peak_pct,
         peak_rain_time=peak_time,
-        uv_index=0,  # populated by parse_uv in Task 3
+        uv_index=uv,
     )

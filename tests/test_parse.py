@@ -155,3 +155,15 @@ def test_parse_uv_handles_extra_whitespace():
     from burevestnik.parse import parse_uv
     html = '<html><body><div class="uv-index"><span class="uv-risk"></span>\n    UV   7   \n</div></body></html>'
     assert parse_uv(html) == 7
+
+
+def test_extract_populates_uv_index_today_mode():
+    f = extract(FIXTURE)
+    assert f.uv_index == 2
+
+
+def test_extract_populates_uv_index_tomorrow_mode():
+    # Same fixture so same value, but verify the path doesn't accidentally
+    # zero-out UV when for_tomorrow=True.
+    f = extract(FIXTURE, for_tomorrow=True)
+    assert f.uv_index == 2

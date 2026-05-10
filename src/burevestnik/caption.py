@@ -130,7 +130,7 @@ def render(
         )
 
     uv_emoji, uv_label = _uv_band(forecast.uv_index)
-    lines.append(f"UV index: {uv_emoji} {forecast.uv_index} ({uv_label})")
+    lines.append(f"{uv_emoji} UV index {forecast.uv_index} ({uv_label})")
 
     if tomorrow is not None:
         lines.append("")

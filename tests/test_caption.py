@@ -249,14 +249,14 @@ def test_uv_band_maps_to_emoji_and_label(uv, expected_emoji, expected_label):
 def test_render_includes_uv_line_today_mode():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(uv_index=2), now, _SOURCE_URL)
-    assert "UV index: 🟢 2 (Low)" in out
+    assert "🟢 UV index 2 (Low)" in out
 
 
 def test_render_includes_uv_line_tomorrow_mode():
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
     f = _make_forecast(tomorrow=None, uv_index=7)
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
-    assert "UV index: 🟠 7 (High)" in out
+    assert "🟠 UV index 7 (High)" in out
 
 
 def test_render_uv_line_appears_after_sun_line():
@@ -264,7 +264,7 @@ def test_render_uv_line_appears_after_sun_line():
     out = render(_make_forecast(uv_index=4), now, _SOURCE_URL)
     lines = out.splitlines()
     sun_idx = next(i for i, line in enumerate(lines) if "Sun 2h" in line)
-    uv_idx = next(i for i, line in enumerate(lines) if "UV index:" in line)
+    uv_idx = next(i for i, line in enumerate(lines) if "UV index" in line)
     assert uv_idx == sun_idx + 1, (
         f"UV line should immediately follow sun line; "
         f"got sun at {sun_idx}, UV at {uv_idx}"
@@ -279,7 +279,7 @@ def test_render_uv_line_appears_after_wind_when_sun_unavailable():
     assert "☀" not in out  # sun line dropped
     lines = out.splitlines()
     wind_idx = next(i for i, line in enumerate(lines) if line.startswith("💨"))
-    uv_idx = next(i for i, line in enumerate(lines) if "UV index:" in line)
+    uv_idx = next(i for i, line in enumerate(lines) if "UV index" in line)
     assert uv_idx == wind_idx + 1, (
         f"UV line should immediately follow wind line when sun is dropped; "
         f"got wind at {wind_idx}, UV at {uv_idx}"
@@ -319,4 +319,4 @@ def test_render_uv_line_present_at_uv_zero():
     # UV 0 still renders — the layout is unconditional.
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(uv_index=0), now, _SOURCE_URL)
-    assert "UV index: 🟢 0 (Low)" in out
+    assert "🟢 UV index 0 (Low)" in out

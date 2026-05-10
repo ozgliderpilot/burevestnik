@@ -1,10 +1,10 @@
-# burevestnik
+# Burevestnik
 
 [![post](https://github.com/ozgliderpilot/burevestnik/actions/workflows/post.yml/badge.svg)](https://github.com/ozgliderpilot/burevestnik/actions/workflows/post.yml)
 
 Burevestnik (буревестник, "stormy petrel") is a small bot that flies to meteoblue twice a day, screenshots Melbourne CBD's hourly forecast, and squawks the result into a Telegram channel.
 
-![Example post](docs/example-post.png)
+<img src="docs/example-post.png" alt="drawing" width="452"/>
 
 ## How it flies
 

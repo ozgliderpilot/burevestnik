@@ -213,3 +213,99 @@ def test_parse_temp_felt_raises_when_no_numeric_cells():
     """
     with pytest.raises(ValueError, match="temperature-felt"):
         parse_temp_felt(html)
+
+
+def test_parse_peak_rain_mm_returns_zero_for_dry_fixture():
+    # Fixture has tr.precip with all-empty <span>s — no hourly rain mm.
+    from burevestnik.parse import parse_peak_rain_mm
+    mm, t = parse_peak_rain_mm(FIXTURE)
+    assert mm == 0.0
+    assert t == ""
+
+
+def test_parse_peak_rain_mm_picks_max_value():
+    from burevestnik.parse import parse_peak_rain_mm
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr><th></th><th>1000</th><th>1100</th><th>1200</th></tr>
+      <tr class="precip">
+        <th>mm</th>
+        <td><span>0.5</span></td>
+        <td><span>1.5</span></td>
+        <td><span>0.2</span></td>
+      </tr>
+    </table>
+    </body></html>
+    """
+    mm, t = parse_peak_rain_mm(html)
+    assert mm == 1.5
+    assert t == "11:00"
+
+
+def test_parse_peak_rain_mm_breaks_ties_to_earliest():
+    from burevestnik.parse import parse_peak_rain_mm
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr><th></th><th>1000</th><th>1100</th><th>1200</th></tr>
+      <tr class="precip">
+        <th>mm</th>
+        <td><span>1.5</span></td>
+        <td><span>2.0</span></td>
+        <td><span>2.0</span></td>
+      </tr>
+    </table>
+    </body></html>
+    """
+    mm, t = parse_peak_rain_mm(html)
+    assert mm == 2.0
+    assert t == "11:00"
+
+
+def test_parse_peak_rain_mm_handles_unlabeled_midnight_column():
+    # Mirrors parse_peak_rain: an empty <td> for the midnight column whose
+    # label is implicit. If midnight is the peak, time is "00:00".
+    from burevestnik.parse import parse_peak_rain_mm
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr><th></th><td></td><td>0100</td><td>0200</td></tr>
+      <tr class="precip">
+        <th>mm</th>
+        <td><span>3.0</span></td>
+        <td><span>1.0</span></td>
+        <td><span>0.5</span></td>
+      </tr>
+    </table>
+    </body></html>
+    """
+    mm, t = parse_peak_rain_mm(html)
+    assert mm == 3.0
+    assert t == "00:00"
+
+
+def test_parse_peak_rain_mm_returns_empty_when_all_empty_cells():
+    from burevestnik.parse import parse_peak_rain_mm
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr><th></th><th>0100</th><th>0200</th></tr>
+      <tr class="precip">
+        <th>mm</th>
+        <td><span></span></td>
+        <td><span></span></td>
+      </tr>
+    </table>
+    </body></html>
+    """
+    mm, t = parse_peak_rain_mm(html)
+    assert mm == 0.0
+    assert t == ""
+
+
+def test_parse_peak_rain_mm_raises_when_row_missing():
+    from burevestnik.parse import parse_peak_rain_mm
+    html = '<html><body><table class="hourlywind"><tr><th></th></tr></table></body></html>'
+    with pytest.raises(ValueError, match="precip"):
+        parse_peak_rain_mm(html)

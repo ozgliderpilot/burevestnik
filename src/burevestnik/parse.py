@@ -197,6 +197,70 @@ def parse_temp_felt(html: str) -> tuple[int, int]:
     return max(values), min(values)
 
 
+_PRECIP_MM_RE = re.compile(r"(\d+(?:\.\d+)?)")
+
+
+def _hour_labels(header_row) -> list[str]:
+    """Extract HH:00 labels from a table.hourlywind header row.
+
+    Each header cell text is reduced to digits; the first two digits are
+    interpreted as hours. Cells without parseable hours map to "" so the
+    list stays index-aligned with the data row.
+    """
+    hours: list[str] = []
+    for cell in header_row.css("th, td"):
+        digits = re.sub(r"\D", "", cell.text(strip=True))
+        if len(digits) >= 2 and digits[:2].isdigit():
+            hh = int(digits[:2])
+            if 0 <= hh <= 23:
+                hours.append(f"{hh:02d}:00")
+                continue
+        hours.append("")
+    return hours
+
+
+def parse_peak_rain_mm(html: str) -> tuple[float, str]:
+    """Find the peak hourly rainfall in mm from tr.precip.
+
+    Returns (max_mm, "HH:00") with earliest-hour tie-break. Returns
+    (0.0, "") when every cell is empty or zero.
+
+    Raises ValueError when tr.precip itself is missing.
+    """
+    doc = HTMLParser(html)
+    table = doc.css_first("table.hourlywind")
+    if table is None:
+        raise ValueError("table.hourlywind not found in document")
+
+    rain_row = table.css_first("tr.precip")
+    if rain_row is None:
+        raise ValueError("tr.precip row not found in table.hourlywind")
+
+    rows = table.css("tr")
+    hours = _hour_labels(rows[0]) if rows else []
+
+    cells = rain_row.css("th, td")
+    values: list[tuple[float, str]] = []  # (mm, hour_label)
+    for idx, cell in enumerate(cells):
+        m = _PRECIP_MM_RE.search(cell.text())
+        if m is None:
+            continue
+        values.append((float(m.group(1)), hours[idx] if idx < len(hours) else ""))
+
+    if not values:
+        return 0.0, ""
+
+    max_mm = max(mm for mm, _ in values)
+    if max_mm == 0.0:
+        return 0.0, ""
+
+    # Earliest tie-break (document order). Midnight fallback on empty label.
+    for mm, hour in values:
+        if mm == max_mm:
+            return mm, hour or "00:00"
+    return 0.0, ""
+
+
 def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     """Parse the displayed forecast from a meteoblue weekly-view HTML.
 

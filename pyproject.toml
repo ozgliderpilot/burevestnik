@@ -6,8 +6,8 @@ requires-python = ">=3.12"
 dependencies = [
     "playwright>=1.40",
     "httpx>=0.25",
-    "astral>=3.2",
     "selectolax>=0.3.20",
+    "tzdata; sys_platform == 'win32'",  # zoneinfo needs the IANA db on Windows; on Linux runners it's in the OS
 ]
 
 [project.optional-dependencies]

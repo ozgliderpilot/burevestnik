@@ -167,8 +167,10 @@ def parse_peak_rain_mm(html: str) -> tuple[float, str]:
     if rain_row is None:
         raise ValueError("tr.precip row not found in table.hourlywind")
 
-    rows = table.css("tr")
-    hours = _hour_labels(rows[0]) if rows else []
+    header_row = table.css_first("tr.times")
+    if header_row is None:
+        raise ValueError("tr.times header row not found in table.hourlywind")
+    hours = _hour_labels(header_row)
 
     cells = rain_row.css("th, td")
     values: list[tuple[float, str]] = []  # (mm, hour_label)
@@ -246,6 +248,33 @@ def parse_peak_gust_kn(html: str) -> int:
     return max(values)
 
 
+_HHMM_RE = re.compile(r"\b(\d{1,2}:\d{2})\b")
+
+
+def parse_sun_times(html: str) -> tuple[str, str] | tuple[None, None]:
+    """Extract (sunrise, sunset) as "HH:MM" strings from the page.
+
+    meteoblue renders these as `<div title="Sunrise">… 07:08</div>` and
+    `<div title="Sunset">… 17:23</div>`, duplicated across no-mobile /
+    no-desktop variants. We take the first occurrence of each. The times
+    already reflect whichever day the page was fetched for (today, or
+    tomorrow via ?day=2), so no date math is needed downstream.
+
+    Returns (None, None) when either div is missing or its text contains
+    no parseable HH:MM — the caption treats the sun line as optional.
+    """
+    doc = HTMLParser(html)
+    rise_el = doc.css_first('div[title="Sunrise"]')
+    set_el = doc.css_first('div[title="Sunset"]')
+    if rise_el is None or set_el is None:
+        return None, None
+    rise_m = _HHMM_RE.search(rise_el.text())
+    set_m = _HHMM_RE.search(set_el.text())
+    if rise_m is None or set_m is None:
+        return None, None
+    return rise_m.group(1), set_m.group(1)
+
+
 def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     """Parse the displayed forecast from a meteoblue weekly-view HTML.
 
@@ -267,6 +296,7 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     uv = parse_uv(html)
     wind_lo, wind_hi = parse_wind_range(html)
     gust = parse_peak_gust_kn(html)
+    sunrise, sunset = parse_sun_times(html)
     return Forecast(
         today=primary,
         tomorrow=next_day,
@@ -278,4 +308,6 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
         wind_kn_low=wind_lo,
         wind_kn_high=wind_hi,
         gust_kn_max=gust,
+        sunrise=sunrise,
+        sunset=sunset,
     )

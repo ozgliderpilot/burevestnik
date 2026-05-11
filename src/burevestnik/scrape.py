@@ -38,7 +38,7 @@ def fetch(url: str) -> tuple[str, bytes]:
                 [{**c, "domain": _COOKIE_DOMAIN, "path": "/"} for c in _UNIT_COOKIES]
             )
             page = context.new_page()
-            page.goto(url, wait_until="networkidle")
+            page.goto(url, wait_until="domcontentloaded")
             _dismiss_banner(page)
 
             page.locator("label.switch-with-label").first.click()

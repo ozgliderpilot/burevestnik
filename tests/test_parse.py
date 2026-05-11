@@ -168,7 +168,7 @@ def test_parse_peak_rain_mm_picks_max_value():
     html = """
     <html><body>
     <table class="hourlywind">
-      <tr><th></th><th>1000</th><th>1100</th><th>1200</th></tr>
+      <tr class="times"><th></th><th>1000</th><th>1100</th><th>1200</th></tr>
       <tr class="precip">
         <th>mm</th>
         <td><span>0.5</span></td>
@@ -188,7 +188,7 @@ def test_parse_peak_rain_mm_breaks_ties_to_earliest():
     html = """
     <html><body>
     <table class="hourlywind">
-      <tr><th></th><th>1000</th><th>1100</th><th>1200</th></tr>
+      <tr class="times"><th></th><th>1000</th><th>1100</th><th>1200</th></tr>
       <tr class="precip">
         <th>mm</th>
         <td><span>1.5</span></td>
@@ -210,7 +210,7 @@ def test_parse_peak_rain_mm_handles_unlabeled_midnight_column():
     html = """
     <html><body>
     <table class="hourlywind">
-      <tr><th></th><td></td><td>0100</td><td>0200</td></tr>
+      <tr class="times"><th></th><td></td><td>0100</td><td>0200</td></tr>
       <tr class="precip">
         <th>mm</th>
         <td><span>3.0</span></td>
@@ -230,7 +230,7 @@ def test_parse_peak_rain_mm_returns_empty_when_all_empty_cells():
     html = """
     <html><body>
     <table class="hourlywind">
-      <tr><th></th><th>0100</th><th>0200</th></tr>
+      <tr class="times"><th></th><th>0100</th><th>0200</th></tr>
       <tr class="precip">
         <th>mm</th>
         <td><span></span></td>
@@ -248,6 +248,25 @@ def test_parse_peak_rain_mm_raises_when_row_missing():
     from burevestnik.parse import parse_peak_rain_mm
     html = '<html><body><table class="hourlywind"><tr><th></th></tr></table></body></html>'
     with pytest.raises(ValueError, match="precip"):
+        parse_peak_rain_mm(html)
+
+
+def test_parse_peak_rain_mm_raises_when_times_row_missing():
+    # If the precip row is present but the tr.times header row is not, the
+    # parser can no longer align cells to hour labels and must fail loudly
+    # rather than silently mislabel the peak hour.
+    from burevestnik.parse import parse_peak_rain_mm
+    html = """
+    <html><body>
+    <table class="hourlywind">
+      <tr class="precip">
+        <th>mm</th>
+        <td><span>1.0</span></td>
+      </tr>
+    </table>
+    </body></html>
+    """
+    with pytest.raises(ValueError, match="tr.times"):
         parse_peak_rain_mm(html)
 
 
@@ -336,3 +355,40 @@ def test_extract_populates_wind_and_gust_fields():
     assert f.wind_kn_low == 2
     assert f.wind_kn_high == 7
     assert f.gust_kn_max == 22
+
+
+def test_parse_sun_times_extracts_fixture_values():
+    from burevestnik.parse import parse_sun_times
+    rise, sset = parse_sun_times(FIXTURE)
+    # Fixture's <div title="Sunrise/Sunset"> blocks carry these times.
+    assert rise == "07:03"
+    assert sset == "17:30"
+
+
+def test_parse_sun_times_returns_none_when_blocks_missing():
+    from burevestnik.parse import parse_sun_times
+    html = "<html><body><div>no sun blocks here</div></body></html>"
+    assert parse_sun_times(html) == (None, None)
+
+
+def test_parse_sun_times_returns_none_when_only_sunrise_present():
+    from burevestnik.parse import parse_sun_times
+    html = '<html><body><div title="Sunrise">07:08</div></body></html>'
+    assert parse_sun_times(html) == (None, None)
+
+
+def test_parse_sun_times_returns_none_when_time_unparseable():
+    from burevestnik.parse import parse_sun_times
+    html = (
+        '<html><body>'
+        '<div title="Sunrise">no time</div>'
+        '<div title="Sunset">no time</div>'
+        '</body></html>'
+    )
+    assert parse_sun_times(html) == (None, None)
+
+
+def test_extract_populates_sun_times():
+    f = extract(FIXTURE)
+    assert f.sunrise == "07:03"
+    assert f.sunset == "17:30"

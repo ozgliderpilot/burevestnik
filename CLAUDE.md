@@ -18,7 +18,7 @@ uv run pytest                       # run all tests
 uv run pytest tests/test_parse.py::test_parse_day_today_extracts_temps  # single test
 ```
 
-Required env vars at runtime: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Optional override: `METEOBLUE_URL` (defaults to Melbourne CBD weekly view). Empty strings count as missing — `_require_env` deliberately treats `""` as unset because GitHub Actions substitutes missing repo secrets with empty strings, which would otherwise produce a confusing 404 from Telegram.
+Required env vars at runtime: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Optional overrides: `METEOBLUE_URL` (defaults to Melbourne CBD weekly view) and `FORECAST_TZ` (IANA timezone name, defaults to `Australia/Melbourne`; controls the today/tomorrow cutoff and the "Updated HH:MM TZ" caption stamp — lat/lon for sunrise/sunset stay hardcoded). Empty strings count as missing — `_require_env` deliberately treats `""` as unset because GitHub Actions substitutes missing repo secrets with empty strings, which would otherwise produce a confusing 404 from Telegram.
 
 ## Architecture
 

@@ -25,3 +25,5 @@ class Forecast:
     wind_kn_low: int             # min hourly wind kn across the displayed day's windspeed row
     wind_kn_high: int            # max hourly wind kn across the displayed day's windspeed row
     gust_kn_max: int             # max hourly gust kn across the displayed day's windgust row
+    sunrise: str | None          # "HH:MM" from the page's sun-times block; None if missing
+    sunset: str | None           # "HH:MM" from the page's sun-times block; None if missing

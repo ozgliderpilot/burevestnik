@@ -27,6 +27,7 @@ def test_forecast_constructs():
         uv_index=2,
         temp_felt_max_c=18, temp_felt_min_c=10,
         wind_kn_low=2, wind_kn_high=7, gust_kn_max=22,
+        sunrise="07:03", sunset="17:30",
     )
     assert f.peak_rain_mm == 1.5
     assert f.temp_felt_max_c == 18
@@ -47,6 +48,7 @@ def test_forecast_has_uv_index():
         uv_index=4,
         temp_felt_max_c=18, temp_felt_min_c=10,
         wind_kn_low=2, wind_kn_high=7, gust_kn_max=22,
+        sunrise="07:03", sunset="17:30",
     )
     assert f.uv_index == 4
 

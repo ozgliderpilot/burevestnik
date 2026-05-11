@@ -1,6 +1,11 @@
-"""Entry point. Reads env, gates on Melbourne local hour, posts to Telegram.
+"""Entry point. Reads env, selects today vs. tomorrow forecast by local hour, posts to Telegram.
 
 Run: uv run python -m burevestnik.main
+
+Env overrides:
+  METEOBLUE_URL  — page to scrape (default: Melbourne CBD weekly view)
+  FORECAST_TZ    — IANA timezone name (default: Australia/Melbourne) controlling
+                   the today/tomorrow cutoff and the "Updated HH:MM TZ" caption line
 """
 import os
 import sys
@@ -9,21 +14,18 @@ from zoneinfo import ZoneInfo
 
 from burevestnik import caption, parse, scrape, telegram
 
-MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 DEFAULT_URL = (
     "https://www.meteoblue.com/en/weather/week/melbourne-cbd_australia_11523810"
 )
-TOMORROW_CUTOFF_HOUR = 16  # 16:00 Melbourne local — runs at/after this post tomorrow's forecast
-
-
-def should_post(now: datetime, event: str) -> tuple[bool, str]:
-    return True, f"Melbourne hour: {now.hour} — posting"
+DEFAULT_TZ_NAME = "Australia/Melbourne"
+TOMORROW_CUTOFF_HOUR = 16  # 16:00 local — runs at/after this post tomorrow's forecast
 
 
 def should_forecast_tomorrow(now: datetime) -> bool:
     """Return True if the run should post tomorrow's forecast instead of today's.
 
-    Cutoff is 16:00 Melbourne local time inclusive (16:00:00 → True, 15:59:59 → False).
+    Cutoff is 16:00 inclusive in whatever timezone `now` carries (16:00:00 → True,
+    15:59:59 → False). Default is Melbourne; `FORECAST_TZ` env can override.
     """
     return now.hour >= TOMORROW_CUTOFF_HOUR
 
@@ -47,13 +49,8 @@ def _require_env(name: str) -> str:
 def main() -> int:
     print("boot")
 
-    now = datetime.now(MELBOURNE_TZ)
-    event = os.environ.get("GITHUB_EVENT_NAME", "")
-    decision, message = should_post(now, event)
-    print(message)
-    if not decision:
-        return 0
-
+    tz = ZoneInfo(os.environ.get("FORECAST_TZ") or DEFAULT_TZ_NAME)
+    now = datetime.now(tz)
     for_tomorrow = should_forecast_tomorrow(now)
     print(f"mode: {'tomorrow' if for_tomorrow else 'today'}")
 

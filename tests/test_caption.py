@@ -1,6 +1,5 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from unittest.mock import patch
 from burevestnik.caption import render
 from burevestnik.models import DaySummary, Forecast
 
@@ -28,6 +27,8 @@ def _make_forecast(
     wind_kn_low: int = 4,
     wind_kn_high: int = 10,
     gust_kn_max: int = 22,
+    sunrise: str | None = "07:03",
+    sunset: str | None = "17:30",
 ) -> Forecast:
     today = DaySummary(
         label="Today", weekday="Sun",
@@ -42,6 +43,7 @@ def _make_forecast(
         uv_index=uv_index,
         temp_felt_max_c=temp_felt_max_c, temp_felt_min_c=temp_felt_min_c,
         wind_kn_low=wind_kn_low, wind_kn_high=wind_kn_high, gust_kn_max=gust_kn_max,
+        sunrise=sunrise, sunset=sunset,
     )
 
 
@@ -157,11 +159,10 @@ def test_render_wind_line_is_plain_text():
     assert "</b>" not in wind_line
 
 
-def test_drops_sun_line_when_astral_unavailable():
+def test_drops_sun_line_when_sun_times_missing():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast()
-    with patch("burevestnik.caption._sunrise_sunset", return_value=(None, None)):
-        out = render(f, now, _SOURCE_URL)
+    f = _make_forecast(sunrise=None, sunset=None)
+    out = render(f, now, _SOURCE_URL)
     assert "☀" not in out
     assert "🌅" not in out
     assert "🌇" not in out
@@ -199,23 +200,15 @@ def test_render_tomorrow_mode_keeps_run_time_in_updated_line():
     assert "Updated 18:00" in out
 
 
-def test_render_tomorrow_mode_uses_shifted_date_for_sun_lookup():
-    # The sunrise/sunset lookup must be for the forecast date (11 May), not
-    # the run date (10 May). Spy on _sunrise_sunset to capture its argument.
+def test_render_tomorrow_mode_uses_forecast_sun_times_verbatim():
+    # Sun times now come straight off the forecast (scraped from the
+    # ?day=2 page in tomorrow-mode), not from any per-date lookup —
+    # the caption just renders whatever strings are on the dataclass.
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(tomorrow=None)
-
-    captured: dict = {}
-
-    def spy(now_arg):
-        captured["date"] = now_arg.date()
-        return ("06:00", "17:00")
-
-    with patch("burevestnik.caption._sunrise_sunset", side_effect=spy):
-        render(f, now, _SOURCE_URL, for_tomorrow=True)
-
-    from datetime import date
-    assert captured["date"] == date(2026, 5, 11)
+    f = _make_forecast(tomorrow=None, sunrise="06:55", sunset="17:25")
+    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    assert "🌅 06:55" in out
+    assert "🌇 17:25" in out
 
 
 import pytest
@@ -273,9 +266,8 @@ def test_render_uv_line_appears_after_sun_line():
 
 def test_render_uv_line_appears_after_wind_when_sun_unavailable():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(uv_index=4)
-    with patch("burevestnik.caption._sunrise_sunset", return_value=(None, None)):
-        out = render(f, now, _SOURCE_URL)
+    f = _make_forecast(uv_index=4, sunrise=None, sunset=None)
+    out = render(f, now, _SOURCE_URL)
     assert "☀" not in out  # sun line dropped
     lines = out.splitlines()
     wind_idx = next(i for i, line in enumerate(lines) if line.startswith("💨"))

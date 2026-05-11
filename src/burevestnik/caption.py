@@ -3,21 +3,8 @@
 Telegram caption limit is 1024 chars; output must stay under that.
 """
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-
-from astral import LocationInfo
-from astral.sun import sun
 
 from burevestnik.models import Forecast
-
-MELBOURNE = LocationInfo(
-    name="Melbourne",
-    region="Australia",
-    timezone="Australia/Melbourne",
-    latitude=-37.81,
-    longitude=144.96,
-)
-MELBOURNE_TZ = ZoneInfo("Australia/Melbourne")
 
 
 def _format_rain_range(low: float, high: float) -> str:
@@ -65,14 +52,6 @@ def _uv_band(uv: int) -> tuple[str, str]:
     return "🟣", "Extreme"
 
 
-def _sunrise_sunset(now: datetime) -> tuple[str, str] | tuple[None, None]:
-    try:
-        s = sun(MELBOURNE.observer, date=now.date(), tzinfo=MELBOURNE_TZ)
-        return s["sunrise"].strftime("%H:%M"), s["sunset"].strftime("%H:%M")
-    except (ValueError, KeyError):
-        return None, None
-
-
 def render(
     forecast: Forecast,
     now: datetime,
@@ -89,7 +68,7 @@ def render(
     weekday_long = forecast_dt.strftime("%A")
     date_str = f"{forecast_dt.day} {forecast_dt.strftime('%B')}"
 
-    sunrise, sunset = _sunrise_sunset(forecast_dt)
+    sunrise, sunset = forecast.sunrise, forecast.sunset
 
     lines: list[str] = []
     if for_tomorrow:

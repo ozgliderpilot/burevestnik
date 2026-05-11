@@ -19,15 +19,29 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        run: pip install uv
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
 
-      - name: Install Python deps
+      - name: Install Python deps (with dev)
+        if: github.event_name == 'push'
         run: uv sync --extra dev --frozen
+
+      - name: Install Python deps (runtime only)
+        if: github.event_name != 'push'
+        run: uv sync --frozen
 
       - name: Run tests
         if: github.event_name == 'push'
         run: uv run pytest
+
+      - name: Resolve Playwright version
+        if: github.event_name != 'push'
+        id: pw
+        shell: bash
+        run: |
+          v=$(uv run python -c "from importlib.metadata import version; print(version('playwright'))")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         if: github.event_name != 'push'
@@ -35,8 +49,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
-          restore-keys: playwright-${{ runner.os }}-
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
 
       - name: Install Chromium (cache miss)
         if: github.event_name != 'push' && steps.playwright-cache.outputs.cache-hit != 'true'

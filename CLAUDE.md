@@ -40,3 +40,5 @@ Two key invariants make the parser tractable:
 ## CI behavior
 
 The workflow has dual modes: on `push` to master/main it runs only `pytest` (no browser, no posting). On `schedule` or `workflow_dispatch` it skips tests, restores the Playwright browser cache, and runs the full pipeline. Use `workflow_dispatch` for manual end-to-end tests against the real Telegram channel.
+
+The cron in `post.yml` is `17 6/12 * * *` (UTC). This is chosen so the two daily runs land at ~04:17 and ~16:17 Melbourne local time — the morning run posts today's forecast, the afternoon run crosses the 16:00 cutoff and posts tomorrow's. `FORECAST_TZ` shifts the cutoff and the caption stamp but **does not** retime the cron, so overriding it for a non-Australian timezone will desync the morning/evening framing. If you actually want to retarget a different city, change both the cron schedule and `FORECAST_TZ` together.

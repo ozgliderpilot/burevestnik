@@ -15,8 +15,8 @@ class DaySummary:
 
 @dataclass(frozen=True)
 class Forecast:
-    today: DaySummary
-    tomorrow: DaySummary | None  # None when running in tomorrow-mode (post-16:00)
+    primary: DaySummary              # the day the caption is about (today, or tomorrow in tomorrow-mode)
+    next_day_preview: DaySummary | None  # next-day teaser; None in tomorrow-mode (post-16:00 runs)
     peak_rain_mm: float          # max hourly mm across the displayed day's precip row; 0.0 if dry
     peak_rain_time: str          # "HH:00" — the slot where peak hit; "" if no rain
     uv_index: int                # primary day's UV index (from page-level uv-index block)

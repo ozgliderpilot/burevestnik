@@ -22,7 +22,7 @@ def test_forecast_constructs():
         wind_kn_max=10, rain_mm_low=10.0, rain_mm_high=20.0, sun_hours=2.0,
     )
     f = Forecast(
-        today=day, tomorrow=day,
+        primary=day, next_day_preview=day,
         peak_rain_mm=1.5, peak_rain_time="12:00",
         uv_index=2,
         temp_felt_max_c=18, temp_felt_min_c=10,
@@ -43,7 +43,7 @@ def test_forecast_has_uv_index():
         wind_kn_max=10, rain_mm_low=10.0, rain_mm_high=20.0, sun_hours=2.0,
     )
     f = Forecast(
-        today=day, tomorrow=day,
+        primary=day, next_day_preview=day,
         peak_rain_mm=1.5, peak_rain_time="12:00",
         uv_index=4,
         temp_felt_max_c=18, temp_felt_min_c=10,

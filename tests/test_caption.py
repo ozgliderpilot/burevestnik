@@ -18,7 +18,7 @@ _DEFAULT_TOMORROW = DaySummary(
 def _make_forecast(
     peak_mm: float = 1.5,
     peak_time: str = "12:00",
-    tomorrow: DaySummary | None = _DEFAULT_TOMORROW,
+    next_day_preview: DaySummary | None = _DEFAULT_TOMORROW,
     uv_index: int = 2,
     rain_mm_low: float = 10.0,
     rain_mm_high: float = 20.0,
@@ -30,7 +30,7 @@ def _make_forecast(
     sunrise: str | None = "07:03",
     sunset: str | None = "17:30",
 ) -> Forecast:
-    today = DaySummary(
+    primary = DaySummary(
         label="Today", weekday="Sun",
         temp_max_c=21, temp_min_c=15,
         wind_kn_max=10,
@@ -38,7 +38,7 @@ def _make_forecast(
         sun_hours=2.0,
     )
     return Forecast(
-        today=today, tomorrow=tomorrow,
+        primary=primary, next_day_preview=next_day_preview,
         peak_rain_mm=peak_mm, peak_rain_time=peak_time,
         uv_index=uv_index,
         temp_felt_max_c=temp_felt_max_c, temp_felt_min_c=temp_felt_min_c,
@@ -174,7 +174,7 @@ def test_drops_sun_line_when_sun_times_missing():
 def test_render_tomorrow_mode_header_contains_tomorrow_prefix_and_shifted_date():
     # Run time: Sun 10 May 2026 18:00 → forecast date is Mon 11 May.
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(tomorrow=None)
+    f = _make_forecast(next_day_preview=None)
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
 
     # Header: "🌦 <b>Melbourne CBD</b> · Tomorrow, Monday 11 May"
@@ -187,14 +187,14 @@ def test_render_tomorrow_mode_header_contains_tomorrow_prefix_and_shifted_date()
 
 def test_render_tomorrow_mode_omits_preview_line():
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(tomorrow=None)
+    f = _make_forecast(next_day_preview=None)
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
     assert "<i>Tomorrow:</i>" not in out
 
 
 def test_render_tomorrow_mode_keeps_run_time_in_updated_line():
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(tomorrow=None)
+    f = _make_forecast(next_day_preview=None)
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
     # "Updated 18:00 AEST" — the actual run time, not the forecast date.
     assert "Updated 18:00" in out
@@ -205,7 +205,7 @@ def test_render_tomorrow_mode_uses_forecast_sun_times_verbatim():
     # ?day=2 page in tomorrow-mode), not from any per-date lookup —
     # the caption just renders whatever strings are on the dataclass.
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(tomorrow=None, sunrise="06:55", sunset="17:25")
+    f = _make_forecast(next_day_preview=None, sunrise="06:55", sunset="17:25")
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
     assert "🌅 06:55" in out
     assert "🌇 17:25" in out
@@ -247,7 +247,7 @@ def test_render_includes_uv_line_today_mode():
 
 def test_render_includes_uv_line_tomorrow_mode():
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(tomorrow=None, uv_index=7)
+    f = _make_forecast(next_day_preview=None, uv_index=7)
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
     assert "🟠 UV index 7 (High)" in out
 
@@ -305,6 +305,16 @@ def test_render_tomorrow_preview_line_does_not_include_uv():
 def test_rain_band_maps_peak_to_emoji(peak_mm, expected_emoji):
     from burevestnik.caption import _rain_band
     assert _rain_band(peak_mm) == expected_emoji
+
+
+def test_render_escapes_html_in_source_url():
+    # URLs with `&` are valid; the caption must escape them so Telegram's
+    # HTML parse_mode doesn't reject the message.
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(), now, "https://example.com/x?a=1&b=2&c=<3>")
+    assert "https://example.com/x?a=1&amp;b=2&amp;c=&lt;3&gt;" in out
+    # Raw ampersand must not appear inside the href.
+    assert 'href="https://example.com/x?a=1&b=2' not in out
 
 
 def test_render_uv_line_present_at_uv_zero():

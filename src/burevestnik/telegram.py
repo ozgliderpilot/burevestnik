@@ -24,4 +24,10 @@ def send_photo(token: str, chat_id: str, image: bytes, caption: str) -> None:
         files={"photo": ("forecast.jpg", image, "image/jpeg")},
         timeout=30.0,
     )
-    response.raise_for_status()
+    if response.is_error:
+        # Telegram's 4xx bodies carry a JSON "description" field that explains
+        # why (e.g. "caption is too long", "can't parse entities at offset N").
+        # raise_for_status() hides this; surface it so cron logs are diagnosable.
+        raise RuntimeError(
+            f"Telegram sendPhoto failed: {response.status_code} {response.text}"
+        )

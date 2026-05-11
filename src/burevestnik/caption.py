@@ -2,6 +2,7 @@
 
 Telegram caption limit is 1024 chars; output must stay under that.
 """
+import html
 from datetime import datetime, timedelta
 
 from burevestnik.models import Forecast
@@ -58,8 +59,8 @@ def render(
     source_url: str,
     for_tomorrow: bool = False,
 ) -> str:
-    today = forecast.today
-    tomorrow = forecast.tomorrow
+    primary = forecast.primary
+    next_day_preview = forecast.next_day_preview
 
     # The displayed forecast date: shift +1 day in tomorrow-mode. The
     # "Updated HH:MM TZ" line below still uses `now` (actual run time).
@@ -84,10 +85,10 @@ def render(
         f"🤚🌡 High {round(forecast.temp_felt_max_c)}° / Low {round(forecast.temp_felt_min_c)}°"
     )
 
-    if today.rain_mm_high == 0:
+    if primary.rain_mm_high == 0:
         lines.append("☔ No rain")
     else:
-        rain_str = _format_rain_range(today.rain_mm_low, today.rain_mm_high)
+        rain_str = _format_rain_range(primary.rain_mm_low, primary.rain_mm_high)
         rain_line = f"☔ Rain {rain_str}"
         if forecast.peak_rain_mm > 0:
             rain_line += (
@@ -105,24 +106,24 @@ def render(
 
     if sunrise is not None and sunset is not None:
         lines.append(
-            f"☀ Sun {round(today.sun_hours)}h · 🌅 {sunrise} · 🌇 {sunset}"
+            f"☀ Sun {round(primary.sun_hours)}h · 🌅 {sunrise} · 🌇 {sunset}"
         )
 
     uv_emoji, uv_label = _uv_band(forecast.uv_index)
     lines.append(f"{uv_emoji} UV index {forecast.uv_index} ({uv_label})")
 
-    if tomorrow is not None:
+    if next_day_preview is not None:
         lines.append("")
-        tomorrow_rain = _format_rain_range(tomorrow.rain_mm_low, tomorrow.rain_mm_high)
+        preview_rain = _format_rain_range(next_day_preview.rain_mm_low, next_day_preview.rain_mm_high)
         lines.append(
-            f"<i>Tomorrow:</i> {round(tomorrow.temp_max_c)}°/{round(tomorrow.temp_min_c)}° "
-            f"· {tomorrow_rain} · wind {round(tomorrow.wind_kn_max)}kn"
+            f"<i>Tomorrow:</i> {round(next_day_preview.temp_max_c)}°/{round(next_day_preview.temp_min_c)}° "
+            f"· {preview_rain} · wind {round(next_day_preview.wind_kn_max)}kn"
         )
 
     lines.append("")
     lines.append(
         f'<i>Updated {now.strftime("%H:%M %Z")} · '
-        f'forecast by <a href="{source_url}">meteoblue</a></i>'
+        f'forecast by <a href="{html.escape(source_url, quote=True)}">meteoblue</a></i>'
     )
 
     return "\n".join(lines)

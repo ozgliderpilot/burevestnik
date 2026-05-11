@@ -188,10 +188,8 @@ def parse_peak_rain_mm(html: str) -> tuple[float, str]:
         return 0.0, ""
 
     # Earliest tie-break (document order). Midnight fallback on empty label.
-    for mm, hour in values:
-        if mm == max_mm:
-            return mm, hour or "00:00"
-    return 0.0, ""
+    peak_hour = next(hour for mm, hour in values if mm == max_mm)
+    return max_mm, peak_hour or "00:00"
 
 
 _INT_CELL_RE = re.compile(r"-?\d+")
@@ -279,7 +277,7 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     """Parse the displayed forecast from a meteoblue weekly-view HTML.
 
     today-mode (default): #day1 → primary, #day2 → next-day preview.
-    tomorrow-mode: #day2 → primary, no next-day preview (Forecast.tomorrow=None).
+    tomorrow-mode: #day2 → primary, no next-day preview (next_day_preview=None).
 
     The hourly metrics (peak rain mm, felt temp high/low) are read from
     table.hourlywind, which reflects whichever day the page was fetched
@@ -298,8 +296,8 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     gust = parse_peak_gust_kn(html)
     sunrise, sunset = parse_sun_times(html)
     return Forecast(
-        today=primary,
-        tomorrow=next_day,
+        primary=primary,
+        next_day_preview=next_day,
         peak_rain_mm=peak_mm,
         peak_rain_time=peak_time,
         uv_index=uv,

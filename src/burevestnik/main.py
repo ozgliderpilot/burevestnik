@@ -71,7 +71,7 @@ def main() -> int:
 
     forecast = parse.extract(html, for_tomorrow=for_tomorrow)
     print(
-        f"parsed: today {forecast.today.temp_max_c}°/{forecast.today.temp_min_c}°, "
+        f"parsed: {forecast.primary.temp_max_c}°/{forecast.primary.temp_min_c}°, "
         f"peak rain {forecast.peak_rain_mm}mm at {forecast.peak_rain_time or 'n/a'}"
     )
 

@@ -45,8 +45,8 @@ def test_parse_day_raises_on_missing_selector():
 def test_extract_returns_full_forecast():
     f = extract(FIXTURE)
     assert isinstance(f, Forecast)
-    assert f.today.label == "Today"
-    assert f.tomorrow.label == "Tomorrow"
+    assert f.primary.label == "Today"
+    assert f.next_day_preview.label == "Tomorrow"
     # Fixture's tr.precip is all-empty, so peak mm is 0.0.
     assert f.peak_rain_mm == 0.0
     assert f.peak_rain_time == ""
@@ -59,12 +59,12 @@ def test_extract_for_tomorrow_uses_day2_as_primary():
     f = extract(FIXTURE, for_tomorrow=True)
     # #day2's long-label is "Tomorrow" in the meteoblue fixture; with
     # for_tomorrow=True we promote that day to the primary slot.
-    assert f.today.label == "Tomorrow"
+    assert f.primary.label == "Tomorrow"
 
 
-def test_extract_for_tomorrow_sets_tomorrow_field_to_none():
+def test_extract_for_tomorrow_sets_next_day_preview_to_none():
     f = extract(FIXTURE, for_tomorrow=True)
-    assert f.tomorrow is None
+    assert f.next_day_preview is None
     # Sanity: peak rain still resolves (parser ignores the flag for hourly
     # — the page swap from ?day=2 is the runtime mechanism).
     assert f.peak_rain_mm >= 0.0

@@ -51,13 +51,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
 
-      - name: Install Chromium (cache miss)
+      - name: Install Chromium browser
         if: github.event_name != 'push' && steps.playwright-cache.outputs.cache-hit != 'true'
-        run: uv run playwright install --with-deps chromium
-
-      - name: Install Chromium system deps only (cache hit)
-        if: github.event_name != 'push' && steps.playwright-cache.outputs.cache-hit == 'true'
-        run: uv run playwright install-deps chromium
+        # System libs (libnss3, libasound2t64, ...) are preinstalled on the
+        # GitHub-hosted Ubuntu image because it ships Chromium. Skip `--with-deps`
+        # to avoid `apt-get update`.
+        run: uv run playwright install chromium
 
       - name: Post to Telegram
         if: github.event_name != 'push'

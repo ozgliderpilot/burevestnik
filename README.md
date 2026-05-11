@@ -19,7 +19,16 @@ Side effects live at the edges; the middle is pure and tested against a fixed HT
 ```sh
 uv sync --extra dev --frozen
 uv run playwright install chromium
-uv run python -m burevestnik.main  # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID
+uv run python -m burevestnik.main
 ```
+
+Env vars:
+
+| Name                  | Required | Default                                  | Notes                                                                     |
+|-----------------------|----------|------------------------------------------|---------------------------------------------------------------------------|
+| `TELEGRAM_BOT_TOKEN`  | yes      | —                                        | Bot token from BotFather.                                                 |
+| `TELEGRAM_CHAT_ID`    | yes      | —                                        | Numeric (`-100…`) or `@channel_username`.                                 |
+| `METEOBLUE_URL`       | no       | Melbourne CBD weekly view                | Any meteoblue weekly-view URL. The `?day=2` swap is appended automatically. |
+| `FORECAST_TZ`         | no       | `Australia/Melbourne`                    | IANA timezone name; controls the today/tomorrow cutoff (16:00 local) and the "Updated HH:MM TZ" caption stamp. |
 
 For architecture invariants, CI modes, and parser internals, see [CLAUDE.md](CLAUDE.md).

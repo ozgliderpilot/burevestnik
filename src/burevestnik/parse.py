@@ -184,7 +184,8 @@ def parse_peak_rain_mm(html: str) -> tuple[float, str]:
         return 0.0, ""
 
     max_mm = max(mm for mm, _ in values)
-    if max_mm == 0.0:
+    # meteoblue reports precip at 0.1mm precision, so anything below that is no rain.
+    if max_mm < 0.05:
         return 0.0, ""
 
     # Earliest tie-break (document order). Midnight fallback on empty label.

@@ -9,6 +9,14 @@ __pycache__/
 # uv
 .uv-cache/
 
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# SonarScanner
+.scannerwork/
+
 # Playwright artifacts
 .playwright-mcp/
 test-results/

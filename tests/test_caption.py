@@ -59,9 +59,12 @@ def test_render_full_template():
     # Felt-temp headline (no <b>, hand+thermometer icon)
     assert "🤚🌡 High 18° / Low 10°" in out
 
-    # Rain line — peak mm with intensity band, plain (un-bolded) value
+    # Rain line — peak mm with intensity band, plain (un-bolded) value.
+    # The band emoji + "@HH:00" already convey "peak hourly", so the
+    # literal word "Peak" is dropped.
     assert "10–20mm" in out                 # en-dash
-    assert "🟡 Peak 1.5mm at 12:00" in out
+    assert "🟡 1.5mm @12:00" in out
+    assert "Peak" not in out
     assert "<b>1.5mm</b>" not in out
 
     # Wind (knots) — hourly range + peak gust, all plain text
@@ -103,8 +106,9 @@ def test_renders_no_rain_when_daily_range_zero():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     f = _make_forecast(rain_mm_low=0.0, rain_mm_high=0.0, peak_mm=0.0, peak_time="")
     out = render(f, now, _SOURCE_URL)
-    assert "☔ No rain" in out
-    assert "Peak" not in out
+    # The whole rain line is just "☔ No rain" — no peak tail appended.
+    rain_line = next(line for line in out.splitlines() if line.startswith("☔"))
+    assert rain_line == "☔ No rain"
     # Other lines still present
     assert "🤚🌡" in out
     assert "💨" in out
@@ -116,21 +120,21 @@ def test_omits_peak_tail_when_peak_mm_zero_but_range_nonzero():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     f = _make_forecast(rain_mm_low=0.0, rain_mm_high=2.0, peak_mm=0.0, peak_time="")
     out = render(f, now, _SOURCE_URL)
-    assert "☔ Rain 0–2mm" in out
-    assert "Peak" not in out
+    rain_line = next(line for line in out.splitlines() if line.startswith("☔"))
+    assert rain_line == "☔ Rain 0–2mm"
 
 
 def test_render_peak_mm_formats_one_decimal():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(peak_mm=1.5, peak_time="14:00"), now, _SOURCE_URL)
-    assert "🟡 Peak 1.5mm at 14:00" in out
+    assert "🟡 1.5mm @14:00" in out
     assert "<b>1.5mm</b>" not in out
 
 
 def test_render_peak_mm_strips_trailing_zero():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(peak_mm=12.0, peak_time="14:00"), now, _SOURCE_URL)
-    assert "🔴 Peak 12mm at 14:00" in out
+    assert "🔴 12mm @14:00" in out
     assert "12.0mm" not in out
     assert "<b>12mm</b>" not in out
 

@@ -51,8 +51,8 @@ def test_render_full_template():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(), now, _SOURCE_URL)
 
-    # Header line
-    assert "<b>Melbourne CBD</b>" in out
+    # Header line — no "Melbourne CBD" (channel name covers location).
+    assert "Melbourne CBD" not in out
     assert "Sunday" in out
     assert "3 May" in out
 
@@ -177,8 +177,8 @@ def test_render_tomorrow_mode_header_contains_tomorrow_prefix_and_shifted_date()
     f = _make_forecast(next_day_preview=None)
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
 
-    # Header: "🌦 <b>Melbourne CBD</b> · Tomorrow, Monday 11 May"
-    assert "<b>Melbourne CBD</b>" in out
+    # Header: "🌦 Tomorrow, Monday 11 May" — no "Melbourne CBD".
+    assert "Melbourne CBD" not in out
     assert "Tomorrow, Monday" in out
     assert "11 May" in out
     # Today-mode header pattern must NOT appear (no plain "Sunday, 10 May").
@@ -387,8 +387,9 @@ def test_render_header_uses_condition_emoji_today_mode():
         sunrise=f.sunrise, sunset=f.sunset,
     )
     out = render(f, now, _SOURCE_URL)
-    assert "⛅ <b>Melbourne CBD</b>" in out
-    assert "🌦 <b>Melbourne CBD</b>" not in out
+    lines = out.splitlines()
+    assert lines[0].startswith("⛅ ")
+    assert "Melbourne CBD" not in out
 
 
 def test_render_header_uses_condition_emoji_tomorrow_mode():
@@ -412,11 +413,30 @@ def test_render_header_uses_condition_emoji_tomorrow_mode():
         sunrise=f.sunrise, sunset=f.sunset,
     )
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
-    assert "🌧 <b>Melbourne CBD</b>" in out
+    lines = out.splitlines()
+    assert lines[0].startswith("🌧 ")
 
 
 def test_render_header_falls_back_when_condition_missing():
     # condition=None must not crash the render; falls back to default 🌦.
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(), now, _SOURCE_URL)
-    assert "🌦 <b>Melbourne CBD</b>" in out
+    lines = out.splitlines()
+    assert lines[0].startswith("🌦 ")
+
+
+def test_no_blank_line_between_header_and_felt_temp():
+    # Headline (line 0) flows directly into the felt-temp line (line 1) — no
+    # gap — so iPhone push-notification summaries can show both at a glance.
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(), now, _SOURCE_URL)
+    lines = out.splitlines()
+    assert lines[1].startswith("🤚🌡"), f"line[1] should be the felt-temp line; got: {lines[1]!r}"
+
+
+def test_no_blank_line_between_header_and_felt_temp_tomorrow_mode():
+    now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(next_day_preview=None)
+    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    lines = out.splitlines()
+    assert lines[1].startswith("🤚🌡"), f"line[1] should be the felt-temp line; got: {lines[1]!r}"

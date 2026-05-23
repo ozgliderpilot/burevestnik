@@ -108,14 +108,11 @@ def render(
 
     lines: list[str] = []
     if for_tomorrow:
-        lines.append(
-            f"{header_emoji} <b>Melbourne CBD</b> · Tomorrow, {weekday_long} {date_str}"
-        )
+        lines.append(f"{header_emoji} Tomorrow, {weekday_long} {date_str}")
     else:
-        lines.append(
-            f"{header_emoji} <b>Melbourne CBD</b> · {weekday_long}, {date_str}"
-        )
-    lines.append("")
+        lines.append(f"{header_emoji} {weekday_long}, {date_str}")
+    # No blank line here: keep the headline adjacent to the felt-temp line so
+    # iPhone push-notification previews show both at a glance.
     lines.append(
         f"🤚🌡 High {round(forecast.temp_felt_max_c)}° / Low {round(forecast.temp_felt_min_c)}°"
     )

@@ -392,3 +392,48 @@ def test_extract_populates_sun_times():
     f = extract(FIXTURE)
     assert f.sunrise == "07:03"
     assert f.sunset == "17:30"
+
+
+def test_parse_day_populates_condition_from_pictogram_alt():
+    # #day1's .weather-pictogram-wrapper.day img has alt="Partly cloudy".
+    day = parse_day(FIXTURE, "#day1")
+    assert day.condition == "Partly cloudy"
+
+
+def test_parse_day_populates_condition_for_day2():
+    # #day2 also carries a day-pictogram; in tomorrow-mode this is what
+    # drives the headline emoji.
+    day = parse_day(FIXTURE, "#day2")
+    assert day.condition == "Partly cloudy"
+
+
+def test_parse_day_condition_is_none_when_pictogram_missing():
+    html = """
+    <html><body>
+    <div id="day1">
+      <span class="tab-day-short">Mon</span>
+      <span class="tab-day-long">Today</span>
+      19 °C 14 °C 7 kn 0-2 mm 5 h
+    </div>
+    </body></html>
+    """
+    day = parse_day(html, "#day1")
+    assert day.condition is None
+
+
+def test_extract_populates_primary_condition():
+    f = extract(FIXTURE)
+    assert f.primary.condition == "Partly cloudy"
+
+
+def test_extract_for_tomorrow_populates_primary_condition_from_day2():
+    f = extract(FIXTURE, for_tomorrow=True)
+    assert f.primary.condition == "Partly cloudy"
+
+
+def test_extract_populates_next_day_preview_condition():
+    # Symmetry: even though the caption doesn't render it today, the parser
+    # fills in condition for the next-day preview so the dataclass is uniform.
+    f = extract(FIXTURE)
+    assert f.next_day_preview is not None
+    assert f.next_day_preview.condition == "Partly cloudy"

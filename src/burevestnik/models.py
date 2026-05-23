@@ -11,6 +11,7 @@ class DaySummary:
     rain_mm_low: float
     rain_mm_high: float
     sun_hours: float
+    condition: str | None = None  # day-pictogram alt, e.g. "Partly cloudy"; None if absent
 
 
 @dataclass(frozen=True)

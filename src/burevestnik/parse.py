@@ -64,6 +64,11 @@ def parse_day(html: str, selector: str) -> DaySummary:
         raise ValueError(f"no sun hours in {text!r}")
     sun_hours = float(sun_match.group(1))
 
+    # Day-variant weather pictogram. The `night` sibling is intentionally not
+    # consulted — captions always describe a whole day.
+    pic = el.css_first(".weather-pictogram-wrapper.day img.weather-pictogram")
+    condition = pic.attributes.get("alt") if pic is not None else None
+
     return DaySummary(
         label=label,
         weekday=weekday,
@@ -73,6 +78,7 @@ def parse_day(html: str, selector: str) -> DaySummary:
         rain_mm_low=rain_mm_low,
         rain_mm_high=rain_mm_high,
         sun_hours=sun_hours,
+        condition=condition,
     )
 
 

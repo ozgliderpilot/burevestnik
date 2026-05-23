@@ -37,6 +37,39 @@ def _rain_band(peak_mm: float) -> str:
     return "🔴"
 
 
+def _condition_emoji(title: str | None) -> str:
+    """Map a meteoblue weather-pictogram alt text to a single emoji.
+
+    Rules are checked in priority order — first match wins. Priority encodes
+    "what to communicate above all else": severe weather > rain > clouds > clear.
+    Unknown/empty/None titles fall back to 🌦.
+    """
+    if not title:
+        return "🌦"
+    t = title.lower()
+    if "thunder" in t:
+        return "⛈"
+    if "snow" in t or "sleet" in t:
+        return "🌨"
+    if "fog" in t or "mist" in t:
+        return "🌫"
+    if "rain" in t or "shower" in t or "drizzle" in t:
+        if "occasional" in t or "light" in t or "few" in t:
+            return "🌦"
+        return "🌧"
+    if "overcast" in t:
+        return "☁"
+    if "mostly cloudy" in t:
+        return "🌥"
+    if "partly cloudy" in t:
+        return "⛅"
+    if "few clouds" in t:
+        return "🌤"
+    if "clear" in t:
+        return "☀"
+    return "🌦"
+
+
 def _uv_band(uv: int) -> tuple[str, str]:
     """Map a UV index to (emoji, risk label) per WHO bands.
 
@@ -71,14 +104,16 @@ def render(
 
     sunrise, sunset = forecast.sunrise, forecast.sunset
 
+    header_emoji = _condition_emoji(primary.condition)
+
     lines: list[str] = []
     if for_tomorrow:
         lines.append(
-            f"🌦 <b>Melbourne CBD</b> · Tomorrow, {weekday_long} {date_str}"
+            f"{header_emoji} <b>Melbourne CBD</b> · Tomorrow, {weekday_long} {date_str}"
         )
     else:
         lines.append(
-            f"🌦 <b>Melbourne CBD</b> · {weekday_long}, {date_str}"
+            f"{header_emoji} <b>Melbourne CBD</b> · {weekday_long}, {date_str}"
         )
     lines.append("")
     lines.append(

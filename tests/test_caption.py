@@ -322,3 +322,101 @@ def test_render_uv_line_present_at_uv_zero():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(uv_index=0), now, _SOURCE_URL)
     assert "🟢 UV index 0 (Low)" in out
+
+
+# ── Headline condition emoji ─────────────────────────────────────────────
+
+@pytest.mark.parametrize(
+    "title,expected",
+    [
+        # Every label observed in tests/fixtures/meteoblue.html.
+        ("Clear, cloudless sky",                  "☀"),
+        ("Clear and few clouds",                  "🌤"),   # "few clouds" wins before "clear"
+        ("Partly cloudy",                         "⛅"),
+        ("Overcast",                              "☁"),
+        ("Overcast with rain",                    "🌧"),
+        ("Overcast with occasional rain",         "🌦"),
+        ("Mostly cloudy with occasional rain",    "🌦"),
+        ("Mostly cloudy",                         "🌥"),
+        # Plausible labels not in the fixture — keyword priority survives.
+        ("Mostly cloudy with thunderstorms",      "⛈"),   # thunder beats everything
+        ("Light rain",                            "🌦"),
+        ("Heavy rain",                            "🌧"),
+        ("Few showers",                           "🌦"),
+        ("Fog",                                   "🌫"),
+        ("Mist",                                  "🌫"),
+        ("Light snow showers",                    "🌨"),  # snow beats rain sub-rule
+        ("Sleet",                                 "🌨"),
+        ("Drizzle",                               "🌧"),
+        ("Light drizzle",                         "🌦"),
+        # Case-insensitivity — meteoblue is consistent but be defensive.
+        ("PARTLY CLOUDY",                         "⛅"),
+        # Fallback cases.
+        ("",                                      "🌦"),
+        ("Some weather we've never seen",         "🌦"),
+    ],
+)
+def test_condition_emoji_maps_title_to_emoji(title, expected):
+    from burevestnik.caption import _condition_emoji
+    assert _condition_emoji(title) == expected
+
+
+def test_condition_emoji_none_falls_back_to_default():
+    from burevestnik.caption import _condition_emoji
+    assert _condition_emoji(None) == "🌦"
+
+
+def test_render_header_uses_condition_emoji_today_mode():
+    # Partly cloudy → ⛅ on the today header line.
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast()
+    f = Forecast(
+        primary=DaySummary(
+            label=f.primary.label, weekday=f.primary.weekday,
+            temp_max_c=f.primary.temp_max_c, temp_min_c=f.primary.temp_min_c,
+            wind_kn_max=f.primary.wind_kn_max,
+            rain_mm_low=f.primary.rain_mm_low, rain_mm_high=f.primary.rain_mm_high,
+            sun_hours=f.primary.sun_hours,
+            condition="Partly cloudy",
+        ),
+        next_day_preview=f.next_day_preview,
+        peak_rain_mm=f.peak_rain_mm, peak_rain_time=f.peak_rain_time,
+        uv_index=f.uv_index,
+        temp_felt_max_c=f.temp_felt_max_c, temp_felt_min_c=f.temp_felt_min_c,
+        wind_kn_low=f.wind_kn_low, wind_kn_high=f.wind_kn_high, gust_kn_max=f.gust_kn_max,
+        sunrise=f.sunrise, sunset=f.sunset,
+    )
+    out = render(f, now, _SOURCE_URL)
+    assert "⛅ <b>Melbourne CBD</b>" in out
+    assert "🌦 <b>Melbourne CBD</b>" not in out
+
+
+def test_render_header_uses_condition_emoji_tomorrow_mode():
+    # In tomorrow-mode the same emoji-pick logic runs against forecast.primary.condition.
+    now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
+    f = _make_forecast(next_day_preview=None)
+    f = Forecast(
+        primary=DaySummary(
+            label="Tomorrow", weekday="Mon",
+            temp_max_c=f.primary.temp_max_c, temp_min_c=f.primary.temp_min_c,
+            wind_kn_max=f.primary.wind_kn_max,
+            rain_mm_low=f.primary.rain_mm_low, rain_mm_high=f.primary.rain_mm_high,
+            sun_hours=f.primary.sun_hours,
+            condition="Overcast with rain",
+        ),
+        next_day_preview=None,
+        peak_rain_mm=f.peak_rain_mm, peak_rain_time=f.peak_rain_time,
+        uv_index=f.uv_index,
+        temp_felt_max_c=f.temp_felt_max_c, temp_felt_min_c=f.temp_felt_min_c,
+        wind_kn_low=f.wind_kn_low, wind_kn_high=f.wind_kn_high, gust_kn_max=f.gust_kn_max,
+        sunrise=f.sunrise, sunset=f.sunset,
+    )
+    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    assert "🌧 <b>Melbourne CBD</b>" in out
+
+
+def test_render_header_falls_back_when_condition_missing():
+    # condition=None must not crash the render; falls back to default 🌦.
+    now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render(_make_forecast(), now, _SOURCE_URL)
+    assert "🌦 <b>Melbourne CBD</b>" in out

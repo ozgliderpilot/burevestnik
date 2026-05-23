@@ -60,10 +60,10 @@ def test_render_full_template():
     assert "🤚🌡 High 18° / Low 10°" in out
 
     # Rain line — peak mm with intensity band, plain (un-bolded) value.
-    # The band emoji + "at HH:00" already convey "peak hourly", so the
+    # The band emoji + "@HH:00" already convey "peak hourly", so the
     # literal word "Peak" is dropped.
     assert "10–20mm" in out                 # en-dash
-    assert "🟡 1.5mm at 12:00" in out
+    assert "🟡 1.5mm @12:00" in out
     assert "Peak" not in out
     assert "<b>1.5mm</b>" not in out
 
@@ -127,14 +127,14 @@ def test_omits_peak_tail_when_peak_mm_zero_but_range_nonzero():
 def test_render_peak_mm_formats_one_decimal():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(peak_mm=1.5, peak_time="14:00"), now, _SOURCE_URL)
-    assert "🟡 1.5mm at 14:00" in out
+    assert "🟡 1.5mm @14:00" in out
     assert "<b>1.5mm</b>" not in out
 
 
 def test_render_peak_mm_strips_trailing_zero():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     out = render(_make_forecast(peak_mm=12.0, peak_time="14:00"), now, _SOURCE_URL)
-    assert "🔴 12mm at 14:00" in out
+    assert "🔴 12mm @14:00" in out
     assert "12.0mm" not in out
     assert "<b>12mm</b>" not in out
 

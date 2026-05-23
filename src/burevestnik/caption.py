@@ -123,12 +123,12 @@ def render(
         rain_str = _format_rain_range(primary.rain_mm_low, primary.rain_mm_high)
         rain_line = f"☔ Rain {rain_str}"
         if forecast.peak_rain_mm > 0:
-            # Band emoji + "at HH:00" already signal a peak hourly value,
+            # Band emoji + "@HH:00" already signal a peak hourly value,
             # so the literal word "Peak" is omitted to keep the line short.
             rain_line += (
                 f" · {_rain_band(forecast.peak_rain_mm)}"
                 f" {_format_peak_mm(forecast.peak_rain_mm)}"
-                f" at {forecast.peak_rain_time}"
+                f" @{forecast.peak_rain_time}"
             )
         lines.append(rain_line)
 

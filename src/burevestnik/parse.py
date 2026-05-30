@@ -9,6 +9,7 @@ from burevestnik.models import DaySummary, Forecast
 
 _TEMP_RE = re.compile(r"(-?\d+)\s*\xb0C")   # matches "19 °C" — text already normalized via split()/join()
 _WIND_RE = re.compile(r"(\d+)\s*kn(?![a-zA-Z])")
+_WIND_INT_RE = re.compile(r"\d+")
 _RAIN_RE = re.compile(r"(\d+(?:\.\d+)?)(?:\s*[-–]\s*(\d+(?:\.\d+)?))?\s*mm")
 _SUN_RE = re.compile(r"(\d+(?:\.\d+)?)\s*h\b")
 
@@ -22,7 +23,15 @@ def parse_day(html: str, selector: str) -> DaySummary:
 
     Weekday and label are extracted from the .tab-day-short and .tab-day-long
     child elements because they are sometimes concatenated without a separator
-    in the flattened text. Numeric values are extracted with regexes.
+    in the flattened text. The four numeric fields are likewise read from their
+    dedicated children (.tab-temp-max/.tab-temp-min, div.wind, div.tab-precip,
+    div.tab-sun) rather than the flattened tab text: on high-wind days the wind
+    value loses its inline "kn" unit and becomes a range ("13-34") that runs
+    straight into the rain field in the flattened text ("13-345-10 mm"), which
+    defeats unit-anchored regexes — so each field is isolated to its own
+    element, with a flattened-text regex fallback for markup that lacks the
+    dedicated divs. See _parse_temps_c / _parse_wind_kn_max / _parse_rain_mm /
+    _parse_sun_hours.
     """
     doc = HTMLParser(html)
     el = doc.css_first(selector)
@@ -40,29 +49,10 @@ def parse_day(html: str, selector: str) -> DaySummary:
     # Full normalised text for numeric extraction.
     text = " ".join(el.text(strip=True).split())
 
-    temps = _TEMP_RE.findall(text)
-    if len(temps) < 2:
-        raise ValueError(f"expected two °C values in {text!r}")
-    temp_max_c, temp_min_c = int(temps[0]), int(temps[1])
-
-    wind_match = _WIND_RE.search(text)
-    if wind_match is None:
-        raise ValueError(f"no wind speed in {text!r}")
-    wind_kn_max = int(wind_match.group(1))
-
-    rain_match = _RAIN_RE.search(text)
-    if rain_match is not None:
-        rain_mm_low = float(rain_match.group(1))
-        rain_mm_high = float(rain_match.group(2)) if rain_match.group(2) else rain_mm_low
-    else:
-        # Dry forecast: meteoblue shows a dash instead of a mm range, treated as 0 mm.
-        rain_mm_low = 0.0
-        rain_mm_high = 0.0
-
-    sun_match = _SUN_RE.search(text)
-    if sun_match is None:
-        raise ValueError(f"no sun hours in {text!r}")
-    sun_hours = float(sun_match.group(1))
+    temp_max_c, temp_min_c = _parse_temps_c(el, text)
+    wind_kn_max = _parse_wind_kn_max(el, text)
+    rain_mm_low, rain_mm_high = _parse_rain_mm(el, text)
+    sun_hours = _parse_sun_hours(el, text)
 
     # Day-variant weather pictogram. The `night` sibling is intentionally not
     # consulted — captions always describe a whole day.
@@ -80,6 +70,94 @@ def parse_day(html: str, selector: str) -> DaySummary:
         sun_hours=sun_hours,
         condition=condition,
     )
+
+
+def _parse_temps_c(el, text: str) -> tuple[int, int]:
+    """Resolve (max, min) day-tab temperature in °C.
+
+    Reads the dedicated div.tab-temp-max / div.tab-temp-min children ("14 °C")
+    rather than relying on the order of °C tokens in the flattened tab text.
+    Falls back to the first two °C values in the flattened text when those divs
+    are absent (e.g. synthetic test markup). See parse_day's docstring for why
+    every numeric field is isolated to its own element.
+    """
+    max_el = el.css_first("div.tab-temp-max")
+    min_el = el.css_first("div.tab-temp-min")
+    if max_el is not None and min_el is not None:
+        max_m = _TEMP_RE.search(max_el.text())
+        min_m = _TEMP_RE.search(min_el.text())
+        if max_m is not None and min_m is not None:
+            return int(max_m.group(1)), int(min_m.group(1))
+
+    temps = _TEMP_RE.findall(text)
+    if len(temps) < 2:
+        raise ValueError(f"expected two °C values in {text!r}")
+    return int(temps[0]), int(temps[1])
+
+
+def _parse_wind_kn_max(el, text: str) -> int:
+    """Resolve the day-tab wind speed in knots, tolerating high-wind markup.
+
+    Normal days render the wind as a single value with an inline unit
+    ("8 kn") inside div.wind. High-wind days render a "speed-gust" range
+    without the unit ("13-34" = 13 kn wind, 34 kn gust) and move the unit into
+    the div's title attribute (title="Wind speed (kn)") plus a warning
+    background colour. We take the first value — the wind speed — which is the
+    single value on normal days and the lower (left) bound of the range on
+    high-wind days (gusts are surfaced separately via gust_kn_max from the
+    hourly table). Reading the dedicated div.wind mirrors how
+    weekday/label/condition are read from dedicated children rather than the
+    flattened tab text. Falls back to the kn-anchored regex on the flattened
+    text when div.wind is absent (e.g. synthetic test markup).
+    """
+    wind_el = el.css_first("div.wind")
+    if wind_el is not None:
+        nums = _WIND_INT_RE.findall(wind_el.text())
+        if nums:
+            return int(nums[0])
+
+    wind_match = _WIND_RE.search(text)
+    if wind_match is None:
+        raise ValueError(f"no wind speed in {text!r}")
+    return int(wind_match.group(1))
+
+
+def _parse_rain_mm(el, text: str) -> tuple[float, float]:
+    """Resolve the day-tab precipitation (low, high) in mm.
+
+    Reads the dedicated div.tab-precip ("5-10 mm", "0-2 mm", or "-" when dry)
+    rather than the flattened tab text. This matters on high-wind days: the
+    wind range loses its inline unit ("13-34") and runs straight into the rain
+    field in the flattened text ("13-345-10 mm"), which would make _RAIN_RE
+    misread the low bound as 345. Falls back to the flattened text when
+    div.tab-precip is absent (e.g. synthetic test markup). A dash (no match)
+    is a dry forecast → (0.0, 0.0).
+    """
+    precip_el = el.css_first("div.tab-precip")
+    source = precip_el.text() if precip_el is not None else text
+    m = _RAIN_RE.search(source)
+    if m is None:
+        return 0.0, 0.0
+    low = float(m.group(1))
+    high = float(m.group(2)) if m.group(2) else low
+    return low, high
+
+
+def _parse_sun_hours(el, text: str) -> float:
+    """Resolve the day-tab sunshine hours.
+
+    Reads the dedicated div.tab-sun child ("4 h") rather than the flattened tab
+    text, falling back to the flattened text when that div is absent (e.g.
+    synthetic test markup). See parse_day's docstring for why every numeric
+    field is isolated to its own element. Raises ValueError when no parseable
+    "N h" value is found, preserving the original loud-failure behaviour.
+    """
+    sun_el = el.css_first("div.tab-sun")
+    source = sun_el.text() if sun_el is not None else text
+    m = _SUN_RE.search(source)
+    if m is None:
+        raise ValueError(f"no sun hours in {text!r}")
+    return float(m.group(1))
 
 
 _UV_RE = re.compile(r"UV\s*(\d+)")

@@ -37,6 +37,99 @@ def test_parse_day_tomorrow_has_label():
     assert day.rain_mm_high >= day.rain_mm_low
 
 
+def test_parse_day_high_wind_range_without_kn_unit():
+    # On high-wind days meteoblue drops the inline "kn" unit and renders a
+    # "speed-gust" range (e.g. "13-34" = 13 kn wind, 34 kn gust); the unit
+    # moves into the div's title attribute. parse_day must read the dedicated
+    # div.wind and resolve wind_kn_max to the wind speed (lower bound), not the
+    # gust. Regression for the #day2 high-wind crash.
+    html = """
+    <html><body>
+    <div id="day2">
+      <div class="tab-day-short">Mon</div>
+      <div class="tab-day-long">Tomorrow</div>
+      <div class="temps">
+        <div class="tab-temp-max">13 °C</div>
+        <div class="tab-temp-min">9 °C</div>
+      </div>
+      <div class="data">
+        <div class="wind" title="Wind speed (kn)">
+          <span class="glyph winddir N"></span>
+          13-34
+        </div>
+        <div class="tab-precip"><span class="glyph rain"></span>5-10 mm</div>
+        <div class="tab-sun"><span class="glyph sunshine"></span>2 h</div>
+      </div>
+    </div>
+    </body></html>
+    """
+    day = parse_day(html, "#day2")
+    assert day.wind_kn_max == 13
+    assert day.rain_mm_low == 5.0
+    assert day.rain_mm_high == 10.0
+    # Temps and sun are read from their dedicated divs too, so the high-wind
+    # range concatenation can't bleed into them either.
+    assert day.temp_max_c == 13
+    assert day.temp_min_c == 9
+    assert day.sun_hours == 2.0
+
+
+def test_parse_day_prefers_dedicated_divs_over_flattened_text():
+    # Each numeric field is isolated to its own child element, so a stray
+    # number elsewhere in the tab's flattened text must not be picked up.
+    # The dedicated divs say 13°/9°, 8 kn, 5 mm, 2 h; the decoy text would
+    # mislead an order-dependent flattened-text scan.
+    html = """
+    <html><body>
+    <div id="day2">
+      <div class="tab-day-short">Mon</div>
+      <div class="tab-day-long">Tomorrow</div>
+      <div class="decoy">99 °C 77 °C 88 kn 44 mm 66 h</div>
+      <div class="temps">
+        <div class="tab-temp-max">13 °C</div>
+        <div class="tab-temp-min">9 °C</div>
+      </div>
+      <div class="data">
+        <div class="wind" title="Wind speed"><span class="glyph"></span>8 kn</div>
+        <div class="tab-precip"><span class="glyph rain"></span>5 mm</div>
+        <div class="tab-sun"><span class="glyph sunshine"></span>2 h</div>
+      </div>
+    </div>
+    </body></html>
+    """
+    day = parse_day(html, "#day2")
+    assert (day.temp_max_c, day.temp_min_c) == (13, 9)
+    assert day.wind_kn_max == 8
+    assert (day.rain_mm_low, day.rain_mm_high) == (5.0, 5.0)
+    assert day.sun_hours == 2.0
+
+
+def test_parse_day_reads_single_wind_value_from_div():
+    # Normal-wind day: div.wind text is "8 kn", giving wind_kn_max == 8.
+    html = """
+    <html><body>
+    <div id="day1">
+      <div class="tab-day-short">Sun</div>
+      <div class="tab-day-long">Today</div>
+      <div class="temps">
+        <div class="tab-temp-max">14 °C</div>
+        <div class="tab-temp-min">10 °C</div>
+      </div>
+      <div class="data">
+        <div class="wind" title="Wind speed">
+          <span class="glyph winddir NW"></span>
+          8 kn
+        </div>
+        <div class="tab-precip"><span class="glyph rain"></span>-</div>
+        <div class="tab-sun"><span class="glyph sunshine"></span>4 h</div>
+      </div>
+    </div>
+    </body></html>
+    """
+    day = parse_day(html, "#day1")
+    assert day.wind_kn_max == 8
+
+
 def test_parse_day_raises_on_missing_selector():
     with pytest.raises(ValueError, match="no element"):
         parse_day(FIXTURE, "#day99")

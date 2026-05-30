@@ -43,6 +43,13 @@ def fetch(url: str) -> tuple[str, bytes]:
 
             page.locator("label.switch-with-label").first.click()
             page.locator("table.hourlywind").wait_for(state="visible", timeout=5000)
+            # The UV-index / celestial-bodies block hydrates separately from the
+            # hourly table, so table visibility doesn't guarantee it's in the DOM
+            # yet — snapshotting too early drops it and makes parse_uv fail
+            # intermittently. Wait for it (attached, not visible: parse.py reads
+            # whichever responsive copy comes first in document order, which may
+            # be the CSS-hidden one).
+            page.locator("div.uv-index").first.wait_for(state="attached", timeout=5000)
             html = page.content()
             jpeg = page.locator("table.hourlywind").screenshot(
                 type="jpeg", quality=90

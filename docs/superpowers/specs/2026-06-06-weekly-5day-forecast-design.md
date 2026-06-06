@@ -60,15 +60,15 @@ overview is a once-a-week nicety.
 
 ## Caption format
 
-Approved "Option A — compact one line per day", with sun hours included and no
-header line (kept lean):
+Approved "Option A — compact one line per day", trimmed to fit a single mobile
+line: no header, no wind field, space-separated (no middots):
 
 ```
-⛅ Mon · 16°/12° · ☔ 0–2mm · 💨 16kn · ☀ 5h
-🌧 Tue · 17°/11° · ☔ 5–10mm · 💨 20kn · ☀ 2h
-⛅ Wed · 16°/10° · no rain · 💨 14kn · ☀ 6h
-🌦 Thu · 17°/10° · ☔ 1–3mm · 💨 18kn · ☀ 4h
-☀ Fri · 18°/15° · no rain · 💨 15kn · ☀ 8h
+⛅ Mon 16°/12° ☔ 0–2mm ☀ 5h
+🌧 Tue 17°/11° ☔ 5–10mm ☀ 2h
+⛅ Wed 16°/10° no rain ☀ 6h
+🌦 Thu 17°/10° ☔ 1–3mm ☀ 4h
+☀ Fri 18°/15° no rain ☀ 8h
 
 Updated 04:17 AEST · forecast by meteoblue
 ```
@@ -77,14 +77,14 @@ Rules:
 
 - **No header line.** The caption opens directly with the first day so the
   push-notification preview leads with real data.
-- **Per day** (one line each, fields joined by ` · `):
+- **Per day** (one line each, fields separated by a single space, no middots):
   - condition emoji via the existing `_condition_emoji(DaySummary.condition)`
   - weekday short label from `DaySummary.weekday` (matches the chart's labels)
   - `{temp_max_c}°/{temp_min_c}°`
   - rain: `no rain` when `rain_mm_high == 0`, else
     `☔ {_format_rain_range(rain_mm_low, rain_mm_high)}`
-  - `💨 {wind_kn_max}kn`
   - `☀ {round(sun_hours)}h`
+  - **Wind is omitted** from the weekly line to keep it to one mobile line.
 - **Footer:** identical to the daily caption —
   `<i>Updated HH:MM TZ · forecast by <a href="…">meteoblue</a></i>`, using `now`
   and the unmodified source URL.

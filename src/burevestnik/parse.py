@@ -358,6 +358,16 @@ def parse_sun_times(html: str) -> tuple[str, str] | tuple[None, None]:
     return rise_m.group(1), set_m.group(1)
 
 
+def parse_days(html: str, count: int = 5) -> list[DaySummary]:
+    """Extract the first `count` day-tab summaries (#day1 … #day{count}).
+
+    Reuses parse_day per tab. #day1 is always today, so the list is the next
+    `count` days in order from whatever day the page was fetched on. Raises
+    ValueError (via parse_day) if any expected tab is missing.
+    """
+    return [parse_day(html, f"#day{n}") for n in range(1, count + 1)]
+
+
 def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     """Parse the displayed forecast from a meteoblue weekly-view HTML.
 

@@ -59,7 +59,7 @@ def test_parse_days_default_count_is_five():
 def test_parse_days_raises_when_a_tab_is_missing():
     from burevestnik.parse import parse_days
     with pytest.raises(ValueError, match="no element"):
-        parse_days(FIXTURE, 8)  # fixture has only #day1..#day7
+        parse_days(FIXTURE, 15)  # fixture has #day1..#day14
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**

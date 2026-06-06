@@ -101,10 +101,11 @@ def fetch(url: str) -> tuple[str, bytes]:
 def fetch_meteogram(url: str) -> tuple[str, bytes]:
     """Open URL, screenshot the meteogram cropped to its temperature panel.
 
-    Returns (rendered_html, jpeg_bytes). The chart (#blooimage) is a JS-hydrated
-    Highcharts SVG; we wait for it to render, then clip a full-width band from
-    the top of the element down to _TEMP_PANEL_FRACTION of its height. Raises if
-    the chart never renders within 15 seconds (treated as a layout change).
+    Returns (rendered_html, jpeg_bytes). The chart (#blooimage) is a lazy,
+    JS-hydrated Highcharts SVG; we scroll it into view to trigger hydration,
+    wait for it to render, then clip a full-width band between the
+    _TEMP_PANEL_TOP_FRACTION and _TEMP_PANEL_BOTTOM_FRACTION of its height.
+    Raises if the chart never renders within 15 seconds (a layout change).
     """
     with _browser_page() as page:
         page.goto(url, wait_until="domcontentloaded")

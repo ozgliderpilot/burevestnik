@@ -86,6 +86,14 @@ def _uv_band(uv: int) -> tuple[str, str]:
     return "🟣", "Extreme"
 
 
+def _render_footer(now: datetime, source_url: str) -> str:
+    """The shared 'Updated HH:MM TZ · forecast by meteoblue' attribution line."""
+    return (
+        f'<i>Updated {now.strftime("%H:%M %Z")} · '
+        f'forecast by <a href="{html.escape(source_url, quote=True)}">meteoblue</a></i>'
+    )
+
+
 def render(
     forecast: Forecast,
     now: datetime,
@@ -155,10 +163,7 @@ def render(
         )
 
     lines.append("")
-    lines.append(
-        f'<i>Updated {now.strftime("%H:%M %Z")} · '
-        f'forecast by <a href="{html.escape(source_url, quote=True)}">meteoblue</a></i>'
-    )
+    lines.append(_render_footer(now, source_url))
 
     return "\n".join(lines)
 
@@ -187,8 +192,5 @@ def render_outlook(
         )
 
     lines.append("")
-    lines.append(
-        f'<i>Updated {now.strftime("%H:%M %Z")} · '
-        f'forecast by <a href="{html.escape(source_url, quote=True)}">meteoblue</a></i>'
-    )
+    lines.append(_render_footer(now, source_url))
     return "\n".join(lines)

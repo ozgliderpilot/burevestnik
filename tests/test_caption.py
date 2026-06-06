@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from burevestnik.caption import render
 from burevestnik.models import DaySummary, Forecast
@@ -447,8 +448,6 @@ def test_no_blank_line_between_header_and_felt_temp_tomorrow_mode():
 
 
 # ── 5-day outlook caption ────────────────────────────────────────────────
-
-from pathlib import Path
 
 _FIXTURE = (Path(__file__).parent / "fixtures" / "meteoblue.html").read_text(encoding="utf-8")
 

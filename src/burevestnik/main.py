@@ -19,6 +19,7 @@ DEFAULT_URL = (
 )
 DEFAULT_TZ_NAME = "Australia/Melbourne"
 TOMORROW_CUTOFF_HOUR = 16  # 16:00 local — runs at/after this post tomorrow's forecast
+OUTLOOK_WEEKDAYS = (0, 3)  # Monday, Thursday (datetime.weekday(): Mon=0 … Sun=6)
 
 
 def should_forecast_tomorrow(now: datetime) -> bool:
@@ -28,6 +29,15 @@ def should_forecast_tomorrow(now: datetime) -> bool:
     15:59:59 → False). Default is Melbourne; `FORECAST_TZ` env can override.
     """
     return now.hour >= TOMORROW_CUTOFF_HOUR
+
+
+def should_post_outlook(now: datetime) -> bool:
+    """Return True on the Monday/Thursday morning (today-mode) runs only.
+
+    The extra 5-day outlook post fires once on those mornings, before the daily
+    forecast. The evening runs are tomorrow-mode and are excluded.
+    """
+    return now.weekday() in OUTLOOK_WEEKDAYS and not should_forecast_tomorrow(now)
 
 
 def _require_env(name: str) -> str:

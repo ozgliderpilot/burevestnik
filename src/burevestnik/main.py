@@ -56,6 +56,15 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _post_outlook(token: str, chat_id: str, source_url: str, now: datetime) -> None:
+    """Post the 5-day outlook photo (cropped meteogram + per-day caption)."""
+    html, jpeg = scrape.fetch_meteogram(source_url)
+    days = parse.parse_days(html, 5)
+    text = caption.render_outlook(days, now, source_url)
+    print(f"outlook: {len(days)} days, {len(text)} caption chars")
+    telegram.send_photo(token, chat_id, jpeg, text)
+
+
 def main() -> int:
     print("boot")
 

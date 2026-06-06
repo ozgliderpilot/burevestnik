@@ -372,44 +372,58 @@ def fetch(url: str) -> tuple[str, bytes]:
 
 - [ ] **Step 2: Add `fetch_meteogram`**
 
-Add the crop fraction constant beneath `_COOKIE_DOMAIN`:
+Add the crop fraction constants beneath `_COOKIE_DOMAIN`:
 
 ```python
-# Fraction of the meteogram element height kept by the crop: the top
-# temperature panel only (clouds + wind panels below are dropped). Tuned
-# against a live render — see docs/superpowers/specs crop sample.
-_TEMP_PANEL_FRACTION = 0.42
+# Vertical crop of the meteogram element, as fractions of its height, keeping
+# just the temperature panel: from below the "Melbourne CBD"/logo title band
+# (TOP) down to below the temperature panel's hour-tick row, before the
+# precipitation panel (BOTTOM). The clouds + wind panels are dropped. Tuned
+# against a live 650px render — see the crop sample under docs/superpowers/specs.
+_TEMP_PANEL_TOP_FRACTION = 0.10
+_TEMP_PANEL_BOTTOM_FRACTION = 0.42
 ```
 
-Add after `fetch`:
+Add after `fetch`. NOTE (discovered during live capture): the meteogram is
+**lazy-loaded** — `#blooimage` holds only `<div class="loading">` until it is
+scrolled into the viewport, so we must `scroll_into_view_if_needed()` *before*
+waiting for the Highcharts SVG. The title band ("Melbourne CBD" + lat/lon +
+logo) is part of the 650px SVG, so the crop needs a top offset (not just a
+bottom cut) to match the sample, hence two fractions.
 
 ```python
 def fetch_meteogram(url: str) -> tuple[str, bytes]:
     """Open URL, screenshot the meteogram cropped to its temperature panel.
 
-    Returns (rendered_html, jpeg_bytes). The chart (#blooimage) is a JS-hydrated
-    Highcharts SVG; we wait for it to render, then clip a full-width band from
-    the top of the element down to _TEMP_PANEL_FRACTION of its height. Raises if
-    the chart never renders within 15 seconds (treated as a layout change).
+    Returns (rendered_html, jpeg_bytes). The chart (#blooimage) is a lazy,
+    JS-hydrated Highcharts SVG; we scroll it into view to trigger hydration,
+    wait for it to render, then clip the temperature panel between the TOP and
+    BOTTOM fractions of the element height. Raises if the chart never renders
+    within 15 seconds (treated as a layout change).
     """
     with _browser_page() as page:
         page.goto(url, wait_until="domcontentloaded")
 
-        chart = page.locator("#blooimage svg.highcharts-root")
-        chart.wait_for(state="visible", timeout=15000)
+        # The meteogram is lazy-loaded: it only hydrates once scrolled into the
+        # viewport, so scroll first, then wait for the Highcharts SVG to render.
+        target = page.locator("#blooimage")
+        target.scroll_into_view_if_needed()
+        page.locator("#blooimage svg.highcharts-root").wait_for(
+            state="visible", timeout=15000
+        )
         page.locator(".fc-consent-root").wait_for(state="detached", timeout=5000)
         html = page.content()
 
-        target = page.locator("#blooimage")
-        target.scroll_into_view_if_needed()
         box = target.bounding_box()
         if box is None:
             raise RuntimeError("meteogram #blooimage has no bounding box")
+        top = box["y"] + box["height"] * _TEMP_PANEL_TOP_FRACTION
+        bottom = box["y"] + box["height"] * _TEMP_PANEL_BOTTOM_FRACTION
         clip = {
             "x": box["x"],
-            "y": box["y"],
+            "y": top,
             "width": box["width"],
-            "height": round(box["height"] * _TEMP_PANEL_FRACTION),
+            "height": bottom - top,
         }
         jpeg = page.screenshot(type="jpeg", quality=90, clip=clip)
         return html, jpeg

@@ -77,6 +77,16 @@ def main() -> int:
     chat_id = _require_env("TELEGRAM_CHAT_ID")
     url = os.environ.get("METEOBLUE_URL", DEFAULT_URL)
 
+    # Mon/Thu mornings: post the 5-day outlook first. Best-effort — a failure
+    # here (e.g. the meteogram not rendering) must never block the daily post.
+    if should_post_outlook(now):
+        print("outlook: posting 5-day overview")
+        try:
+            _post_outlook(token, chat_id, url, now)
+            print("outlook: 200 OK")
+        except Exception as exc:  # noqa: BLE001 — deliberately broad; daily post must proceed
+            print(f"WARNING: outlook post failed, continuing to daily: {exc!r}")
+
     # Fetch with ?day=2 in tomorrow-mode so meteoblue renders day-2's
     # hourly table. The unmodified `url` is what we link to in the caption.
     if for_tomorrow:

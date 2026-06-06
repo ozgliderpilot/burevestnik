@@ -19,6 +19,7 @@ DEFAULT_URL = (
 )
 DEFAULT_TZ_NAME = "Australia/Melbourne"
 TOMORROW_CUTOFF_HOUR = 16  # 16:00 local — runs at/after this post tomorrow's forecast
+OUTLOOK_WEEKDAYS = (0, 3)  # Monday, Thursday (datetime.weekday(): Mon=0 … Sun=6)
 
 
 def should_forecast_tomorrow(now: datetime) -> bool:
@@ -28,6 +29,15 @@ def should_forecast_tomorrow(now: datetime) -> bool:
     15:59:59 → False). Default is Melbourne; `FORECAST_TZ` env can override.
     """
     return now.hour >= TOMORROW_CUTOFF_HOUR
+
+
+def should_post_outlook(now: datetime) -> bool:
+    """Return True on the Monday/Thursday morning (today-mode) runs only.
+
+    The extra 5-day outlook post fires once on those mornings, before the daily
+    forecast. The evening runs are tomorrow-mode and are excluded.
+    """
+    return now.weekday() in OUTLOOK_WEEKDAYS and not should_forecast_tomorrow(now)
 
 
 def _require_env(name: str) -> str:
@@ -46,6 +56,15 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _post_outlook(token: str, chat_id: str, source_url: str, now: datetime) -> None:
+    """Post the 5-day outlook photo (cropped meteogram + per-day caption)."""
+    html, jpeg = scrape.fetch_meteogram(source_url)
+    days = parse.parse_days(html, 5)
+    text = caption.render_outlook(days, now, source_url)
+    print(f"outlook: {len(days)} days, {len(text)} caption chars")
+    telegram.send_photo(token, chat_id, jpeg, text)
+
+
 def main() -> int:
     print("boot")
 
@@ -57,6 +76,16 @@ def main() -> int:
     token = _require_env("TELEGRAM_BOT_TOKEN")
     chat_id = _require_env("TELEGRAM_CHAT_ID")
     url = os.environ.get("METEOBLUE_URL", DEFAULT_URL)
+
+    # Mon/Thu mornings: post the 5-day outlook first. Best-effort — a failure
+    # here (e.g. the meteogram not rendering) must never block the daily post.
+    if should_post_outlook(now):
+        print("outlook: posting 5-day overview")
+        try:
+            _post_outlook(token, chat_id, url, now)
+            print("outlook: 200 OK")
+        except Exception as exc:  # noqa: BLE001 — deliberately broad; daily post must proceed
+            print(f"WARNING: outlook post failed, continuing to daily: {exc!r}")
 
     # Fetch with ?day=2 in tomorrow-mode so meteoblue renders day-2's
     # hourly table. The unmodified `url` is what we link to in the caption.

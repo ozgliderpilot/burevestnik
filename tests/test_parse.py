@@ -530,3 +530,36 @@ def test_extract_populates_next_day_preview_condition():
     f = extract(FIXTURE)
     assert f.next_day_preview is not None
     assert f.next_day_preview.condition == "Partly cloudy"
+
+
+def test_parse_days_returns_five_summaries_in_order():
+    from burevestnik.parse import parse_days
+    days = parse_days(FIXTURE, 5)
+    assert len(days) == 5
+    assert [d.weekday for d in days] == ["Tue", "Wed", "Thu", "Fri", "Sat"]
+
+
+def test_parse_days_reads_each_days_fields():
+    from burevestnik.parse import parse_days
+    days = parse_days(FIXTURE, 5)
+    # Locked to the captured fixture's #day1..#day5 tabs.
+    assert (days[0].temp_max_c, days[0].temp_min_c) == (15, 12)
+    assert (days[0].rain_mm_low, days[0].rain_mm_high) == (0.0, 0.0)  # "-" → dry
+    assert days[0].sun_hours == 2.0
+    assert days[0].condition == "Partly cloudy"
+    assert (days[2].temp_max_c, days[2].temp_min_c) == (10, 8)
+    assert (days[2].rain_mm_low, days[2].rain_mm_high) == (5.0, 10.0)
+    assert days[2].condition == "Overcast with rain"
+    assert (days[4].temp_max_c, days[4].temp_min_c) == (16, 12)
+    assert (days[4].rain_mm_low, days[4].rain_mm_high) == (0.0, 2.0)
+
+
+def test_parse_days_default_count_is_five():
+    from burevestnik.parse import parse_days
+    assert len(parse_days(FIXTURE)) == 5
+
+
+def test_parse_days_raises_when_a_tab_is_missing():
+    from burevestnik.parse import parse_days
+    with pytest.raises(ValueError, match="no element"):
+        parse_days(FIXTURE, 15)  # fixture has #day1..#day14

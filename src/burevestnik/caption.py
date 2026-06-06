@@ -5,7 +5,7 @@ Telegram caption limit is 1024 chars; output must stay under that.
 import html
 from datetime import datetime, timedelta
 
-from burevestnik.models import Forecast
+from burevestnik.models import DaySummary, Forecast
 
 
 def _format_rain_range(low: float, high: float) -> str:
@@ -86,6 +86,14 @@ def _uv_band(uv: int) -> tuple[str, str]:
     return "🟣", "Extreme"
 
 
+def _render_footer(now: datetime, source_url: str) -> str:
+    """The shared 'Updated HH:MM TZ · forecast by meteoblue' attribution line."""
+    return (
+        f'<i>Updated {now.strftime("%H:%M %Z")} · '
+        f'forecast by <a href="{html.escape(source_url, quote=True)}">meteoblue</a></i>'
+    )
+
+
 def render(
     forecast: Forecast,
     now: datetime,
@@ -155,9 +163,34 @@ def render(
         )
 
     lines.append("")
-    lines.append(
-        f'<i>Updated {now.strftime("%H:%M %Z")} · '
-        f'forecast by <a href="{html.escape(source_url, quote=True)}">meteoblue</a></i>'
-    )
+    lines.append(_render_footer(now, source_url))
 
+    return "\n".join(lines)
+
+
+def render_outlook(
+    days: list[DaySummary],
+    now: datetime,
+    source_url: str,
+) -> str:
+    """Render a compact 5-day outlook caption (one line per day).
+
+    No header line; each day is `<emoji> <Weekday> <hi>°/<lo>° <rain> ☀ <sun>h`,
+    wind omitted to keep each day on one mobile line. Same footer as the daily
+    caption. Stays well under Telegram's 1024-char limit for 5 days.
+    """
+    lines: list[str] = []
+    for day in days:
+        emoji = _condition_emoji(day.condition)
+        if day.rain_mm_high == 0:
+            rain = "no rain"
+        else:
+            rain = f"☔ {_format_rain_range(day.rain_mm_low, day.rain_mm_high)}"
+        lines.append(
+            f"{emoji} {day.weekday} {day.temp_max_c}°/{day.temp_min_c}° "
+            f"{rain} ☀ {round(day.sun_hours)}h"
+        )
+
+    lines.append("")
+    lines.append(_render_footer(now, source_url))
     return "\n".join(lines)

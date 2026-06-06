@@ -444,3 +444,82 @@ def test_no_blank_line_between_header_and_felt_temp_tomorrow_mode():
     out = render(f, now, _SOURCE_URL, for_tomorrow=True)
     lines = out.splitlines()
     assert lines[1].startswith("🤚🌡"), f"line[1] should be the felt-temp line; got: {lines[1]!r}"
+
+
+# ── 5-day outlook caption ────────────────────────────────────────────────
+
+from pathlib import Path
+
+_FIXTURE = (Path(__file__).parent / "fixtures" / "meteoblue.html").read_text(encoding="utf-8")
+
+
+def _outlook_day(weekday, tmax, tmin, rlow, rhigh, sun, condition):
+    return DaySummary(
+        label="", weekday=weekday,
+        temp_max_c=tmax, temp_min_c=tmin,
+        wind_kn_max=0,
+        rain_mm_low=rlow, rain_mm_high=rhigh,
+        sun_hours=sun, condition=condition,
+    )
+
+
+def test_render_outlook_formats_each_day_on_one_line():
+    from burevestnik.caption import render_outlook
+    now = datetime(2026, 5, 7, 4, 17, tzinfo=ZoneInfo("Australia/Melbourne"))
+    days = [
+        _outlook_day("Thu", 17, 10, 1.0, 3.0, 4.0, "Mostly cloudy with occasional rain"),
+        _outlook_day("Fri", 18, 15, 0.0, 0.0, 8.0, "Clear, cloudless sky"),
+    ]
+    out = render_outlook(days, now, _SOURCE_URL)
+    lines = out.splitlines()
+    assert lines[0] == "🌦 Thu 17°/10° ☔ 1–3mm ☀ 4h"   # rain+occasional → 🌦, en-dash
+    assert lines[1] == "☀ Fri 18°/15° no rain ☀ 8h"      # high==0 → "no rain"
+
+
+def test_render_outlook_has_no_header_line():
+    from burevestnik.caption import render_outlook
+    now = datetime(2026, 5, 7, 4, 17, tzinfo=ZoneInfo("Australia/Melbourne"))
+    days = [_outlook_day("Thu", 17, 10, 0.0, 0.0, 4.0, "Clear, cloudless sky")]
+    out = render_outlook(days, now, _SOURCE_URL)
+    # First line is a day, not a title.
+    assert out.splitlines()[0].startswith("☀ Thu ")
+    assert "outlook" not in out.lower()
+
+
+def test_render_outlook_footer_matches_daily_caption():
+    from burevestnik.caption import render_outlook
+    now = datetime(2026, 5, 7, 4, 17, tzinfo=ZoneInfo("Australia/Melbourne"))
+    days = [_outlook_day("Thu", 17, 10, 0.0, 0.0, 4.0, "Clear, cloudless sky")]
+    out = render_outlook(days, now, _SOURCE_URL)
+    lines = out.splitlines()
+    assert lines[-2] == ""  # blank line before footer
+    assert lines[-1].startswith("<i>Updated 04:17 ")
+    assert f'<a href="{_SOURCE_URL}">meteoblue</a>' in out
+
+
+def test_render_outlook_escapes_url():
+    from burevestnik.caption import render_outlook
+    now = datetime(2026, 5, 7, 4, 17, tzinfo=ZoneInfo("Australia/Melbourne"))
+    days = [_outlook_day("Thu", 17, 10, 0.0, 0.0, 4.0, "Clear, cloudless sky")]
+    out = render_outlook(days, now, "https://example.com/x?a=1&b=2")
+    assert "https://example.com/x?a=1&amp;b=2" in out
+
+
+def test_render_outlook_under_1024_chars():
+    from burevestnik.caption import render_outlook
+    from burevestnik.parse import parse_days
+    now = datetime(2026, 5, 7, 4, 17, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render_outlook(parse_days(_FIXTURE, 5), now, _SOURCE_URL)
+    assert len(out) <= 1024
+
+
+def test_render_outlook_against_fixture():
+    from burevestnik.caption import render_outlook
+    from burevestnik.parse import parse_days
+    now = datetime(2026, 5, 7, 4, 17, tzinfo=ZoneInfo("Australia/Melbourne"))
+    out = render_outlook(parse_days(_FIXTURE, 5), now, _SOURCE_URL)
+    assert "⛅ Tue 15°/12° no rain ☀ 2h" in out
+    assert "⛅ Wed 18°/10° ☔ 2–5mm ☀ 4h" in out
+    assert "🌧 Thu 10°/8° ☔ 5–10mm ☀ 0h" in out
+    assert "🌦 Fri 15°/9° ☔ 2–5mm ☀ 2h" in out
+    assert "🌦 Sat 16°/12° ☔ 0–2mm ☀ 0h" in out

@@ -225,7 +225,7 @@ def render_outlook(
     return "\n".join(lines)
 ```
 
-`DaySummary`, `_condition_emoji`, `_format_rain_range`, `html`, and `datetime` are already imported at the top of `caption.py`.
+`_condition_emoji`, `_format_rain_range`, `html`, and `datetime` are already imported at the top of `caption.py`. **Also add `DaySummary` to the models import** (`caption.py` currently imports only `Forecast`): change `from burevestnik.models import Forecast` → `from burevestnik.models import DaySummary, Forecast`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 

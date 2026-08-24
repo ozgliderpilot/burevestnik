@@ -5,7 +5,7 @@ No I/O, no browser. All inputs are HTML strings; outputs are dataclasses.
 import re
 from selectolax.parser import HTMLParser
 
-from burevestnik.models import DaySummary, Forecast
+from burevestnik.models import DaySummary, Forecast, ForecastDay, ForecastDayKind
 
 _TEMP_RE = re.compile(r"(-?\d+)\s*\xb0C")   # matches "19 °C" — text already normalized via split()/join()
 _WIND_RE = re.compile(r"(\d+)\s*kn(?![a-zA-Z])")
@@ -368,22 +368,23 @@ def parse_days(html: str, count: int = 5) -> list[DaySummary]:
     return [parse_day(html, f"#day{n}") for n in range(1, count + 1)]
 
 
-def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
+def extract(html: str, *, day: ForecastDay) -> Forecast:
     """Parse the displayed forecast from a meteoblue weekly-view HTML.
 
-    today-mode (default): #day1 → primary, #day2 → next-day preview.
-    tomorrow-mode: #day2 → primary, no next-day preview (next_day_preview=None).
+    Primary tab is `#day{day.page_index}`. When Forecast day is Today,
+    `#day{page_index + 1}` is the next-day preview; when it is Tomorrow
+    the preview is omitted (`next_day_preview=None`).
 
     The hourly metrics (peak rain mm, felt temp high/low) are read from
     table.hourlywind, which reflects whichever day the page was fetched
     for (?day=2 swaps it to tomorrow at the runtime/scrape layer).
     """
-    if for_tomorrow:
-        primary = parse_day(html, "#day2")
-        next_day: DaySummary | None = None
+    primary = parse_day(html, f"#day{day.page_index}")
+    next_day: DaySummary | None
+    if day.kind is ForecastDayKind.TOMORROW:
+        next_day = None
     else:
-        primary = parse_day(html, "#day1")
-        next_day = parse_day(html, "#day2")
+        next_day = parse_day(html, f"#day{day.page_index + 1}")
     peak_mm, peak_time = parse_peak_rain_mm(html)
     felt_hi, felt_lo = parse_temp_felt(html)
     uv = parse_uv(html)
@@ -391,6 +392,7 @@ def extract(html: str, *, for_tomorrow: bool = False) -> Forecast:
     gust = parse_peak_gust_kn(html)
     sunrise, sunset = parse_sun_times(html)
     return Forecast(
+        day=day,
         primary=primary,
         next_day_preview=next_day,
         peak_rain_mm=peak_mm,

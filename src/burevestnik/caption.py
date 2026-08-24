@@ -3,9 +3,9 @@
 Telegram caption limit is 1024 chars; output must stay under that.
 """
 import html
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from burevestnik.models import DaySummary, Forecast
+from burevestnik.models import DaySummary, Forecast, ForecastDayKind
 
 
 def _format_rain_range(low: float, high: float) -> str:
@@ -98,24 +98,22 @@ def render(
     forecast: Forecast,
     now: datetime,
     source_url: str,
-    for_tomorrow: bool = False,
 ) -> str:
     primary = forecast.primary
     next_day_preview = forecast.next_day_preview
 
-    # The displayed forecast date: shift +1 day in tomorrow-mode. The
-    # "Updated HH:MM TZ" line below still uses `now` (actual run time).
-    forecast_dt = now + timedelta(days=1) if for_tomorrow else now
-
-    weekday_long = forecast_dt.strftime("%A")
-    date_str = f"{forecast_dt.day} {forecast_dt.strftime('%B')}"
+    # Header date comes from Forecast day. The "Updated HH:MM TZ" line
+    # below still uses `now` (actual run time).
+    forecast_date = forecast.day.date
+    weekday_long = forecast_date.strftime("%A")
+    date_str = f"{forecast_date.day} {forecast_date.strftime('%B')}"
 
     sunrise, sunset = forecast.sunrise, forecast.sunset
 
     header_emoji = _condition_emoji(primary.condition)
 
     lines: list[str] = []
-    if for_tomorrow:
+    if forecast.day.kind is ForecastDayKind.TOMORROW:
         lines.append(f"{header_emoji} Tomorrow, {weekday_long} {date_str}")
     else:
         lines.append(f"{header_emoji} {weekday_long}, {date_str}")

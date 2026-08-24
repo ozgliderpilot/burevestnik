@@ -1,11 +1,11 @@
-"""Entry point. Reads env, selects today vs. tomorrow forecast by local hour, posts to Telegram.
+"""Entry point. Reads env, selects Forecast day by local hour, posts to Telegram.
 
 Run: uv run python -m burevestnik.main
 
 Env overrides:
   METEOBLUE_URL  — page to scrape (default: Melbourne CBD weekly view)
   FORECAST_TZ    — IANA timezone name (default: Australia/Melbourne) controlling
-                   the today/tomorrow cutoff and the "Updated HH:MM TZ" caption line
+                   the Forecast-day cutoff and the "Updated HH:MM TZ" caption line
 """
 import os
 import sys
@@ -13,31 +13,37 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from burevestnik import caption, parse, scrape, telegram
+from burevestnik.models import ForecastDay, ForecastDayKind, forecast_day
 
 DEFAULT_URL = (
     "https://www.meteoblue.com/en/weather/week/melbourne-cbd_australia_11523810"
 )
 DEFAULT_TZ_NAME = "Australia/Melbourne"
-TOMORROW_CUTOFF_HOUR = 16  # 16:00 local — runs at/after this post tomorrow's forecast
 OUTLOOK_WEEKDAYS = (0, 3)  # Monday, Thursday (datetime.weekday(): Mon=0 … Sun=6)
 
 
-def should_forecast_tomorrow(now: datetime) -> bool:
-    """Return True if the run should post tomorrow's forecast instead of today's.
-
-    Cutoff is 16:00 inclusive in whatever timezone `now` carries (16:00:00 → True,
-    15:59:59 → False). Default is Melbourne; `FORECAST_TZ` env can override.
-    """
-    return now.hour >= TOMORROW_CUTOFF_HOUR
-
-
 def should_post_outlook(now: datetime) -> bool:
-    """Return True on the Monday/Thursday morning (today-mode) runs only.
+    """Return True on the Monday/Thursday morning (Forecast day is Today) runs only.
 
     The extra 5-day outlook post fires once on those mornings, before the daily
-    forecast. The evening runs are tomorrow-mode and are excluded.
+    forecast. Evening runs (Forecast day is Tomorrow) are excluded.
     """
-    return now.weekday() in OUTLOOK_WEEKDAYS and not should_forecast_tomorrow(now)
+    return (
+        now.weekday() in OUTLOOK_WEEKDAYS
+        and forecast_day(now).kind is ForecastDayKind.TODAY
+    )
+
+
+def forecast_page_url(source_url: str, day: ForecastDay) -> str:
+    """URL scrape.fetch should open for this Forecast day.
+
+    Today uses the source URL unchanged (that's also the caption link).
+    Tomorrow appends `?day=N` so meteoblue swaps the hourly table.
+    """
+    if day.page_index == 1:
+        return source_url
+    sep = "&" if "?" in source_url else "?"
+    return f"{source_url}{sep}day={day.page_index}"
 
 
 def _require_env(name: str) -> str:
@@ -70,8 +76,8 @@ def main() -> int:
 
     tz = ZoneInfo(os.environ.get("FORECAST_TZ") or DEFAULT_TZ_NAME)
     now = datetime.now(tz)
-    for_tomorrow = should_forecast_tomorrow(now)
-    print(f"mode: {'tomorrow' if for_tomorrow else 'today'}")
+    day = forecast_day(now)
+    print(f"forecast day: {day.kind.value} {day.date.isoformat()}")
 
     token = _require_env("TELEGRAM_BOT_TOKEN")
     chat_id = _require_env("TELEGRAM_CHAT_ID")
@@ -87,24 +93,18 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 — deliberately broad; daily post must proceed
             print(f"WARNING: outlook post failed, continuing to daily: {exc!r}")
 
-    # Fetch with ?day=2 in tomorrow-mode so meteoblue renders day-2's
-    # hourly table. The unmodified `url` is what we link to in the caption.
-    if for_tomorrow:
-        sep = "&" if "?" in url else "?"
-        fetch_url = f"{url}{sep}day=2"
-    else:
-        fetch_url = url
-
-    html, jpeg = scrape.fetch(fetch_url)
+    # The unmodified `url` is what we link to in the caption; scrape.fetch
+    # opens the Forecast-day URL (Today: unchanged; Tomorrow: ?day=2).
+    html, jpeg = scrape.fetch(forecast_page_url(url, day))
     print(f"scraped: {len(jpeg):,} jpeg bytes")
 
-    forecast = parse.extract(html, for_tomorrow=for_tomorrow)
+    forecast = parse.extract(html, day=day)
     print(
         f"parsed: {forecast.primary.temp_max_c}°/{forecast.primary.temp_min_c}°, "
         f"peak rain {forecast.peak_rain_mm}mm at {forecast.peak_rain_time or 'n/a'}"
     )
 
-    text = caption.render(forecast, now, url, for_tomorrow=for_tomorrow)
+    text = caption.render(forecast, now, url)
     print(f"caption: {len(text)} chars")
 
     telegram.send_photo(token, chat_id, jpeg, text)

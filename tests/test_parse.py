@@ -1,9 +1,12 @@
+from datetime import date
 from pathlib import Path
 import pytest
 from burevestnik.parse import parse_day, extract
-from burevestnik.models import Forecast
+from burevestnik.models import Forecast, ForecastDay
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "meteoblue.html").read_text(encoding="utf-8")
+_TODAY = ForecastDay.today(date(2026, 5, 5))
+_TOMORROW = ForecastDay.tomorrow(date(2026, 5, 6))
 
 
 def test_parse_day_today_extracts_temps():
@@ -136,8 +139,9 @@ def test_parse_day_raises_on_missing_selector():
 
 
 def test_extract_returns_full_forecast():
-    f = extract(FIXTURE)
+    f = extract(FIXTURE, day=_TODAY)
     assert isinstance(f, Forecast)
+    assert f.day == _TODAY
     assert f.primary.label == "Today"
     assert f.next_day_preview.label == "Tomorrow"
     # Fixture's tr.precip is all-empty, so peak mm is 0.0.
@@ -148,17 +152,18 @@ def test_extract_returns_full_forecast():
     assert f.temp_felt_min_c == 10
 
 
-def test_extract_for_tomorrow_uses_day2_as_primary():
-    f = extract(FIXTURE, for_tomorrow=True)
-    # #day2's long-label is "Tomorrow" in the meteoblue fixture; with
-    # for_tomorrow=True we promote that day to the primary slot.
+def test_extract_tomorrow_uses_day2_as_primary():
+    f = extract(FIXTURE, day=_TOMORROW)
+    # #day2's long-label is "Tomorrow" in the meteoblue fixture; Forecast
+    # day Tomorrow promotes that tab to the primary slot.
+    assert f.day == _TOMORROW
     assert f.primary.label == "Tomorrow"
 
 
-def test_extract_for_tomorrow_sets_next_day_preview_to_none():
-    f = extract(FIXTURE, for_tomorrow=True)
+def test_extract_tomorrow_sets_next_day_preview_to_none():
+    f = extract(FIXTURE, day=_TOMORROW)
     assert f.next_day_preview is None
-    # Sanity: peak rain still resolves (parser ignores the flag for hourly
+    # Sanity: peak rain still resolves (parser ignores Forecast day for hourly
     # — the page swap from ?day=2 is the runtime mechanism).
     assert f.peak_rain_mm >= 0.0
 
@@ -190,15 +195,15 @@ def test_parse_uv_handles_extra_whitespace():
     assert parse_uv(html) == 7
 
 
-def test_extract_populates_uv_index_today_mode():
-    f = extract(FIXTURE)
+def test_extract_populates_uv_index_today():
+    f = extract(FIXTURE, day=_TODAY)
     assert f.uv_index == 2
 
 
-def test_extract_populates_uv_index_tomorrow_mode():
+def test_extract_populates_uv_index_tomorrow():
     # Same fixture so same value, but verify the path doesn't accidentally
-    # zero-out UV when for_tomorrow=True.
-    f = extract(FIXTURE, for_tomorrow=True)
+    # zero-out UV when Forecast day is Tomorrow.
+    f = extract(FIXTURE, day=_TOMORROW)
     assert f.uv_index == 2
 
 
@@ -444,7 +449,7 @@ def test_parse_peak_gust_kn_raises_when_no_numeric_cells():
 
 
 def test_extract_populates_wind_and_gust_fields():
-    f = extract(FIXTURE)
+    f = extract(FIXTURE, day=_TODAY)
     assert f.wind_kn_low == 2
     assert f.wind_kn_high == 7
     assert f.gust_kn_max == 22
@@ -482,7 +487,7 @@ def test_parse_sun_times_returns_none_when_time_unparseable():
 
 
 def test_extract_populates_sun_times():
-    f = extract(FIXTURE)
+    f = extract(FIXTURE, day=_TODAY)
     assert f.sunrise == "07:03"
     assert f.sunset == "17:30"
 
@@ -515,19 +520,24 @@ def test_parse_day_condition_is_none_when_pictogram_missing():
 
 
 def test_extract_populates_primary_condition():
-    f = extract(FIXTURE)
+    f = extract(FIXTURE, day=_TODAY)
     assert f.primary.condition == "Partly cloudy"
 
 
-def test_extract_for_tomorrow_populates_primary_condition_from_day2():
-    f = extract(FIXTURE, for_tomorrow=True)
+def test_extract_tomorrow_populates_primary_condition_from_day2():
+    f = extract(FIXTURE, day=_TOMORROW)
     assert f.primary.condition == "Partly cloudy"
+
+
+def test_extract_requires_forecast_day():
+    with pytest.raises(TypeError):
+        extract(FIXTURE)
 
 
 def test_extract_populates_next_day_preview_condition():
     # Symmetry: even though the caption doesn't render it today, the parser
     # fills in condition for the next-day preview so the dataclass is uniform.
-    f = extract(FIXTURE)
+    f = extract(FIXTURE, day=_TODAY)
     assert f.next_day_preview is not None
     assert f.next_day_preview.condition == "Partly cloudy"
 

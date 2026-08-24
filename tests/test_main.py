@@ -1,27 +1,13 @@
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from burevestnik.main import should_forecast_tomorrow, should_post_outlook
+from burevestnik.main import forecast_page_url, should_post_outlook
+from burevestnik.models import ForecastDay, ForecastDayKind, forecast_day
+from burevestnik.parse import extract
 
 _TZ = ZoneInfo("Australia/Melbourne")
 _FIXTURE = (Path(__file__).parent / "fixtures" / "meteoblue.html").read_text(encoding="utf-8")
-
-
-def test_should_forecast_tomorrow_false_at_15_59():
-    assert should_forecast_tomorrow(datetime(2026, 5, 10, 15, 59, tzinfo=_TZ)) is False
-
-
-def test_should_forecast_tomorrow_true_at_16_00_exactly():
-    # 16:00:00 is "past 4 PM" colloquially — cutoff fires at the top of the hour.
-    assert should_forecast_tomorrow(datetime(2026, 5, 10, 16, 0, tzinfo=_TZ)) is True
-
-
-def test_should_forecast_tomorrow_true_late_evening():
-    assert should_forecast_tomorrow(datetime(2026, 5, 10, 23, 0, tzinfo=_TZ)) is True
-
-
-def test_should_forecast_tomorrow_false_at_midnight():
-    assert should_forecast_tomorrow(datetime(2026, 5, 11, 0, 0, tzinfo=_TZ)) is False
+_SOURCE = "https://example.com/week"
 
 
 # Fixture confirms 2026-05-05 is a Tuesday → 05-04 Mon, 05-07 Thu, 05-05 Tue.
@@ -45,6 +31,33 @@ def test_should_post_outlook_false_thursday_after_cutoff():
 
 def test_should_post_outlook_false_other_weekday_morning():
     assert should_post_outlook(datetime(2026, 5, 5, 4, 17, tzinfo=_TZ)) is False  # Tue
+
+
+def test_forecast_page_url_today_leaves_source_unmodified():
+    day = ForecastDay.today(date(2026, 5, 10))
+    assert forecast_page_url(_SOURCE, day) == _SOURCE
+
+
+def test_forecast_page_url_tomorrow_appends_day_query():
+    day = ForecastDay.tomorrow(date(2026, 5, 11))
+    assert forecast_page_url(_SOURCE, day) == f"{_SOURCE}?day=2"
+
+
+def test_forecast_page_url_tomorrow_uses_ampersand_when_query_exists():
+    day = ForecastDay.tomorrow(date(2026, 5, 11))
+    assert forecast_page_url(f"{_SOURCE}?x=1", day) == f"{_SOURCE}?x=1&day=2"
+
+
+def test_page_url_and_extract_share_the_same_forecast_day():
+    # The missing wiring test: URL shaping and extract receive one Forecast day.
+    now = datetime(2026, 5, 10, 18, 0, tzinfo=_TZ)
+    day = forecast_day(now)
+    assert day.kind is ForecastDayKind.TOMORROW
+    assert forecast_page_url(_SOURCE, day) == f"{_SOURCE}?day={day.page_index}"
+    forecast = extract(_FIXTURE, day=day)
+    assert forecast.day == day
+    assert forecast.next_day_preview is None
+    assert forecast.primary.label == "Tomorrow"
 
 
 def test_post_outlook_parses_renders_and_sends(monkeypatch):

@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from burevestnik.caption import render
-from burevestnik.models import DaySummary, Forecast
+from burevestnik.models import DaySummary, Forecast, ForecastDay
 
 _SOURCE_URL = "https://www.meteoblue.com/en/weather/week/melbourne-cbd_australia_11523810"
+_TOMORROW_DAY = ForecastDay.tomorrow(date(2026, 5, 11))
 
 
 _DEFAULT_TOMORROW = DaySummary(
@@ -30,6 +31,7 @@ def _make_forecast(
     gust_kn_max: int = 22,
     sunrise: str | None = "07:03",
     sunset: str | None = "17:30",
+    day: ForecastDay | None = None,
 ) -> Forecast:
     primary = DaySummary(
         label="Today", weekday="Sun",
@@ -39,6 +41,7 @@ def _make_forecast(
         sun_hours=2.0,
     )
     return Forecast(
+        day=day or ForecastDay.today(date(2026, 5, 3)),
         primary=primary, next_day_preview=next_day_preview,
         peak_rain_mm=peak_mm, peak_rain_time=peak_time,
         uv_index=uv_index,
@@ -179,8 +182,8 @@ def test_drops_sun_line_when_sun_times_missing():
 def test_render_tomorrow_mode_header_contains_tomorrow_prefix_and_shifted_date():
     # Run time: Sun 10 May 2026 18:00 → forecast date is Mon 11 May.
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(next_day_preview=None)
-    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    f = _make_forecast(day=_TOMORROW_DAY, next_day_preview=None)
+    out = render(f, now, _SOURCE_URL)
 
     # Header: "🌦 Tomorrow, Monday 11 May" — no "Melbourne CBD".
     assert "Melbourne CBD" not in out
@@ -192,15 +195,15 @@ def test_render_tomorrow_mode_header_contains_tomorrow_prefix_and_shifted_date()
 
 def test_render_tomorrow_mode_omits_preview_line():
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(next_day_preview=None)
-    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    f = _make_forecast(day=_TOMORROW_DAY, next_day_preview=None)
+    out = render(f, now, _SOURCE_URL)
     assert "<i>Tomorrow:</i>" not in out
 
 
 def test_render_tomorrow_mode_keeps_run_time_in_updated_line():
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(next_day_preview=None)
-    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    f = _make_forecast(day=_TOMORROW_DAY, next_day_preview=None)
+    out = render(f, now, _SOURCE_URL)
     # "Updated 18:00 AEST" — the actual run time, not the forecast date.
     assert "Updated 18:00" in out
 
@@ -210,8 +213,8 @@ def test_render_tomorrow_mode_uses_forecast_sun_times_verbatim():
     # ?day=2 page in tomorrow-mode), not from any per-date lookup —
     # the caption just renders whatever strings are on the dataclass.
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(next_day_preview=None, sunrise="06:55", sunset="17:25")
-    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    f = _make_forecast(day=_TOMORROW_DAY, next_day_preview=None, sunrise="06:55", sunset="17:25")
+    out = render(f, now, _SOURCE_URL)
     assert "🌅 06:55" in out
     assert "🌇 17:25" in out
 
@@ -252,8 +255,8 @@ def test_render_includes_uv_line_today_mode():
 
 def test_render_includes_uv_line_tomorrow_mode():
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(next_day_preview=None, uv_index=7)
-    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    f = _make_forecast(day=_TOMORROW_DAY, next_day_preview=None, uv_index=7)
+    out = render(f, now, _SOURCE_URL)
     assert "🟠 UV index 7 (High)" in out
 
 
@@ -376,6 +379,7 @@ def test_render_header_uses_condition_emoji_today_mode():
     now = datetime(2026, 5, 3, 14, 32, tzinfo=ZoneInfo("Australia/Melbourne"))
     f = _make_forecast()
     f = Forecast(
+        day=f.day,
         primary=DaySummary(
             label=f.primary.label, weekday=f.primary.weekday,
             temp_max_c=f.primary.temp_max_c, temp_min_c=f.primary.temp_min_c,
@@ -400,8 +404,9 @@ def test_render_header_uses_condition_emoji_today_mode():
 def test_render_header_uses_condition_emoji_tomorrow_mode():
     # In tomorrow-mode the same emoji-pick logic runs against forecast.primary.condition.
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(next_day_preview=None)
+    f = _make_forecast(day=_TOMORROW_DAY, next_day_preview=None)
     f = Forecast(
+        day=_TOMORROW_DAY,
         primary=DaySummary(
             label="Tomorrow", weekday="Mon",
             temp_max_c=f.primary.temp_max_c, temp_min_c=f.primary.temp_min_c,
@@ -417,7 +422,7 @@ def test_render_header_uses_condition_emoji_tomorrow_mode():
         wind_kn_low=f.wind_kn_low, wind_kn_high=f.wind_kn_high, gust_kn_max=f.gust_kn_max,
         sunrise=f.sunrise, sunset=f.sunset,
     )
-    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    out = render(f, now, _SOURCE_URL)
     lines = out.splitlines()
     assert lines[0].startswith("🌧 ")
 
@@ -441,8 +446,8 @@ def test_no_blank_line_between_header_and_felt_temp():
 
 def test_no_blank_line_between_header_and_felt_temp_tomorrow_mode():
     now = datetime(2026, 5, 10, 18, 0, tzinfo=ZoneInfo("Australia/Melbourne"))
-    f = _make_forecast(next_day_preview=None)
-    out = render(f, now, _SOURCE_URL, for_tomorrow=True)
+    f = _make_forecast(day=_TOMORROW_DAY, next_day_preview=None)
+    out = render(f, now, _SOURCE_URL)
     lines = out.splitlines()
     assert lines[1].startswith("🤚🌡"), f"line[1] should be the felt-temp line; got: {lines[1]!r}"
 
